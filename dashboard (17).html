@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoStroy — Панель управления</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root {
+  --bg: #0d0f14;
+  --surface: #151820;
+  --surface2: #1c2030;
+  --border: #252a3a;
+  --border2: #2e3550;
+  --green: #a0bd41;
+  --teal: #37a488;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --text: #e8eaf0;
+  --text2: #8b93a8;
+  --text3: #4a5068;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --display: 'Bebas Neue', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; }
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px; opacity:0.25;
+}
+
+/* ===== LOGIN ===== */
+#loginScreen {
+  position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at center,#0d1420 0%,#0a0c10 100%);
+}
+.login-box {
+  background:var(--surface); border:1px solid var(--border2);
+  border-radius:8px; padding:48px; width:380px;
+  box-shadow:0 40px 80px rgba(0,0,0,0.6);
+  position:relative; overflow:hidden;
+}
+.login-box::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg,var(--green),var(--teal));
+}
+.login-logo { font-family:var(--display); font-size:44px; letter-spacing:4px; margin-bottom:4px; }
+.login-logo span:first-child { color:var(--green); }
+.login-logo span:last-child { color:var(--teal); }
+.login-sub { font-size:11px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:36px; font-family:var(--mono); }
+.login-field { margin-bottom:16px; }
+.login-field label { display:block; font-size:11px; color:var(--text2); letter-spacing:1px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px; }
+.login-field input {
+  width:100%; background:var(--bg); border:1px solid var(--border2);
+  color:var(--text); padding:12px 16px; font-size:14px; font-family:var(--mono);
+  border-radius:4px; outline:none; transition:border-color .2s;
+}
+.login-field input:focus { border-color:var(--green); }
+.login-btn {
+  width:100%; background:linear-gradient(135deg,var(--green),var(--teal));
+  border:none; color:#fff; padding:14px; font-size:14px; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase; font-family:var(--mono);
+  border-radius:4px; cursor:pointer; margin-top:8px; transition:opacity .2s;
+}
+.login-btn:hover { opacity:0.85; }
+.login-err { color:var(--red); font-size:12px; margin-top:10px; text-align:center; display:none; font-family:var(--mono); }
+
+/* ===== LAYOUT ===== */
+#app { display:none; min-height:100vh; }
+.topbar {
+  position:fixed; top:0; left:0; right:0; height:56px; z-index:200;
+  background:rgba(13,15,20,0.95); border-bottom:1px solid var(--border2);
+  display:flex; align-items:center; padding:0 24px; gap:16px;
+  backdrop-filter:blur(12px);
+}
+.topbar-logo { font-family:var(--display); font-size:26px; letter-spacing:3px; }
+.topbar-logo span:first-child { color:var(--green); }
+.topbar-logo span:last-child { color:var(--teal); }
+.topbar-badge { font-size:10px; color:var(--text3); font-family:var(--mono); letter-spacing:1px; margin-top:2px; }
+.topbar-time { font-family:var(--mono); font-size:13px; color:var(--text2); margin-left:auto; }
+.topbar-logout { background:none; border:1px solid var(--border2); color:var(--text2); padding:6px 14px; font-size:12px; border-radius:4px; cursor:pointer; font-family:var(--mono); transition:all .2s; }
+.topbar-logout:hover { border-color:var(--red); color:var(--red); }
+
+.layout { display:flex; padding-top:56px; min-height:100vh; }
+.sidebar {
+  width:220px; min-height:calc(100vh - 56px); background:var(--surface);
+  border-right:1px solid var(--border); padding:24px 0; position:fixed; top:56px; left:0; bottom:0;
+  overflow-y:auto; z-index:100;
+}
+.nav-item {
+  display:flex; align-items:center; gap:12px; padding:12px 20px; cursor:pointer;
+  font-size:13px; color:var(--text2); font-family:var(--mono); letter-spacing:.5px;
+  transition:all .15s; border-left:3px solid transparent;
+}
+.nav-item:hover { color:var(--text); background:rgba(255,255,255,0.03); }
+.nav-item.active { color:var(--green); border-left-color:var(--green); background:rgba(160,189,65,0.06); }
+.nav-item i { width:16px; text-align:center; }
+.nav-sep { height:1px; background:var(--border); margin:12px 20px; }
+.nav-section { font-size:10px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; padding:8px 20px; font-family:var(--mono); }
+
+.main { margin-left:220px; padding:32px; position:relative; z-index:1; }
+
+/* ===== PAGES ===== */
+.page { display:none; }
+.page.active { display:block; }
+.page-title { font-family:var(--display); font-size:32px; letter-spacing:3px; color:var(--text); margin-bottom:4px; }
+.page-sub { font-size:12px; color:var(--text3); font-family:var(--mono); letter-spacing:1px; margin-bottom:28px; }
+
+/* ===== STATS ===== */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px;
+  position:relative; overflow:hidden;
+}
+.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-card.green::before { background:linear-gradient(90deg,var(--green),var(--teal)); }
+.stat-card.red::before { background:var(--red); }
+.stat-card.yellow::before { background:var(--yellow); }
+.stat-card.blue::before { background:var(--blue); }
+.stat-card.teal::before { background:var(--teal); }
+.stat-val { font-family:var(--display); font-size:36px; letter-spacing:2px; color:var(--text); }
+.stat-label { font-size:11px; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; font-family:var(--mono); margin-top:4px; }
+
+/* ===== TABLE ===== */
+.tbl-wrap { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.tbl-toolbar { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.tbl-search { background:var(--bg); border:1px solid var(--border2); color:var(--text); padding:8px 14px; font-size:13px; font-family:var(--mono); border-radius:4px; outline:none; width:220px; }
+.tbl-search:focus { border-color:var(--green); }
+.btn-filter { background:var(--surface2); border:1px solid var(--border2); color:var(--text2); padding:7px 14px; font-size:11px; font-family:var(--mono); border-radius:4px; cursor:pointer; letter-spacing:1px; transition:all .15s; }
+.btn-filter:hover,.btn-filter.active { border-color:var(--green); color:var(--green); }
+.btn-add { background:linear-gradient(135deg,var(--green),var(--teal)); border:none; color:#fff; padding:8px 18px; font-size:12px; font-family:var(--mono); font-weight:700; letter-spacing:1px; border-radius:4px; cursor:pointer; margin-left:auto; transition:opacity .2s; }
+.btn-add:hover { opacity:0.85; }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--surface2); padding:12px 16px; text-align:left; font-size:10px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; font-family:var(--mono); border-bottom:1px solid var(--border); }
+td { padding:12px 16px; font-size:13px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.02); }
+.stock-badge {
+  display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-family:var(--mono); font-weight:700; letter-spacing:1px;
+}
+.stock-in { background:rgba(160,189,65,0.15); color:var(--green); border:1px solid rgba(160,189,65,0.3); }
+.stock-low { background:rgba(245,158,11,0.15); color:var(--yellow); border:1px solid rgba(245,158,11,0.3); }
+.stock-out { background:rgba(239,68,68,0.15); color:var(--red); border:1px solid rgba(239,68,68,0.3); }
+.qty-ctrl { display:flex; align-items:center; gap:6px; }
+.qty-btn { background:var(--surface2); border:1px solid var(--border2); color:var(--text2); width:26px; height:26px; border-radius:4px; cursor:pointer; font-size:14px; font-family:var(--mono); transition:all .15s; display:flex; align-items:center; justify-content:center; }
+.qty-btn:hover { border-color:var(--green); color:var(--green); }
+.qty-val { font-family:var(--mono); font-size:13px; min-width:36px; text-align:center; }
+.action-btn { background:none; border:1px solid var(--border2); color:var(--text2); padding:5px 10px; border-radius:4px; cursor:pointer; font-size:11px; font-family:var(--mono); transition:all .15s; }
+.action-btn:hover { border-color:var(--green); color:var(--green); }
+.action-btn.del:hover { border-color:var(--red); color:var(--red); }
+
+/* ===== SITE CARDS ===== */
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; margin-top:8px; }
+.site-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden;
+  transition:border-color .2s; position:relative;
+}
+.site-card:hover { border-color:var(--border2); }
+.site-card.in-stock { border-top:3px solid var(--green); }
+.site-card.out-stock { border-top:3px solid var(--red); opacity:.7; }
+.site-card-img { width:100%; height:160px; object-fit:cover; background:var(--surface2); display:block; }
+.site-card-img-placeholder { width:100%; height:160px; background:var(--surface2); display:flex; align-items:center; justify-content:center; color:var(--text3); font-size:36px; }
+.site-card-body { padding:14px; }
+.site-card-name { font-weight:700; font-size:14px; color:var(--text); margin-bottom:4px; }
+.site-card-desc { font-size:12px; color:var(--text2); margin-bottom:10px; line-height:1.5; }
+.site-card-price { font-family:var(--mono); font-size:15px; color:var(--green); font-weight:700; }
+.site-card-old { font-family:var(--mono); font-size:12px; color:var(--text3); text-decoration:line-through; margin-left:6px; }
+.site-card-footer { padding:10px 14px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; }
+.card-stock-toggle {
+  font-size:10px; font-family:var(--mono); padding:4px 10px; border-radius:20px; border:none; cursor:pointer; font-weight:700;
+}
+.card-stock-toggle.in { background:rgba(160,189,65,0.15); color:var(--green); }
+.card-stock-toggle.out { background:rgba(239,68,68,0.15); color:var(--red); }
+.card-priority-badge {
+  font-size:9px; font-family:var(--mono); padding:3px 8px; border-radius:20px;
+  background:rgba(160,189,65,0.2); color:var(--green); border:1px solid rgba(160,189,65,0.4);
+  display:inline-flex; align-items:center; gap:4px;
+}
+
+/* ===== MODAL ===== */
+.modal-bg {
+  position:fixed; inset:0; z-index:500; background:rgba(0,0,0,.75);
+  display:none; align-items:center; justify-content:center; padding:20px;
+  backdrop-filter:blur(4px);
+}
+.modal-bg.open { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border2); border-radius:10px;
+  padding:32px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto;
+  position:relative;
+}
+.modal-title { font-family:var(--display); font-size:26px; letter-spacing:2px; margin-bottom:20px; }
+.form-row { margin-bottom:16px; }
+.form-row label { display:block; font-size:11px; color:var(--text2); letter-spacing:1px; text-transform:uppercase; font-family:var(--mono); margin-bottom:7px; }
+.form-row input, .form-row textarea, .form-row select {
+  width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--text);
+  padding:10px 14px; font-size:13px; font-family:var(--mono); border-radius:4px; outline:none; transition:border-color .2s;
+}
+.form-row input:focus, .form-row textarea:focus, .form-row select:focus { border-color:var(--green); }
+.form-row textarea { resize:vertical; min-height:80px; }
+.form-row select option { background:var(--surface2); }
+.form-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.modal-btns { display:flex; gap:10px; margin-top:24px; }
+.btn-save { background:linear-gradient(135deg,var(--green),var(--teal)); border:none; color:#fff; padding:11px 24px; font-size:13px; font-family:var(--mono); font-weight:700; border-radius:4px; cursor:pointer; flex:1; transition:opacity .2s; }
+.btn-save:hover { opacity:.85; }
+.btn-cancel { background:none; border:1px solid var(--border2); color:var(--text2); padding:11px 24px; font-size:13px; font-family:var(--mono); border-radius:4px; cursor:pointer; transition:all .2s; }
+.btn-cancel:hover { border-color:var(--red); color:var(--red); }
+.img-preview { width:100%; height:120px; object-fit:cover; border-radius:6px; margin-top:8px; display:none; background:var(--surface2); }
+
+/* ===== HISTORY ===== */
+.hist-item { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px 18px; margin-bottom:10px; display:flex; align-items:center; gap:14px; }
+.hist-icon { width:36px; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.hist-icon.in { background:rgba(160,189,65,0.15); color:var(--green); }
+.hist-icon.out { background:rgba(239,68,68,0.15); color:var(--red); }
+.hist-icon.edit { background:rgba(59,130,246,0.15); color:var(--blue); }
+.hist-meta { flex:1; }
+.hist-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+.hist-sub { font-size:11px; color:var(--text2); font-family:var(--mono); }
+.hist-time { font-size:11px; color:var(--text3); font-family:var(--mono); text-align:right; }
+
+/* ===== SETTINGS ===== */
+.settings-section { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px; margin-bottom:20px; }
+.settings-title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.settings-title i { color:var(--green); }
+
+/* ===== TOAST ===== */
+#toast {
+  position:fixed; bottom:24px; right:24px; z-index:9999;
+  background:var(--surface); border:1px solid var(--border2); border-radius:6px;
+  padding:14px 20px; font-size:13px; font-family:var(--mono);
+  box-shadow:0 20px 40px rgba(0,0,0,.5); transform:translateY(100px); opacity:0;
+  transition:all .3s; pointer-events:none; max-width:320px;
+}
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.ok { border-left:3px solid var(--green); color:var(--green); }
+#toast.err { border-left:3px solid var(--red); color:var(--red); }
+
+/* ===== ARRIVALS ===== */
+.arrival-form { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px; margin-bottom:24px; }
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar { transform:translateX(-100%); }
+  .main { margin-left:0; padding:20px; }
+  .form-cols { grid-template-columns:1fr; }
+}
+
+/* ===== GPS TRACKER ===== */
+@keyframes pulse {
+  0%,100%{opacity:1;transform:translateY(-50%) scale(1);}
+  50%{opacity:.6;transform:translateY(-50%) scale(1.1);}
+}
+@keyframes markerPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(160,189,65,0.6);}
+  50%{box-shadow:0 0 0 10px rgba(160,189,65,0);}
+}
+@keyframes markerPulseRed {
+  0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6);}
+  50%{box-shadow:0 0 0 10px rgba(239,68,68,0);}
+}
+.gps-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:16px; transition:border-color .2s; cursor:pointer;
+}
+.gps-card:hover { border-color:var(--green); }
+.gps-card.active { border-color:var(--green); background:rgba(160,189,65,0.05); }
+.gps-status-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0;
+  animation:markerPulse 1.5s infinite;
+}
+.gps-status-dot.red { background:var(--red); animation:markerPulseRed 1.5s infinite; }
+.gps-status-dot.grey { background:var(--text3); animation:none; }
+#gpsMap { height:420px; border-radius:8px; overflow:hidden; border:1px solid var(--border); }
+.gps-event-row { padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; display:flex; gap:10px; align-items:flex-start; }
+.gps-event-row:last-child { border-bottom:none; }
+.speed-bar { height:6px; border-radius:3px; background:var(--border2); overflow:hidden; margin-top:4px; }
+.speed-fill { height:100%; border-radius:3px; transition:width .5s; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo"><span>Eco</span><span>Stroy</span></div>
+    <div class="login-sub">Панель управления · v2.0</div>
+    <div class="login-field">
+      <label>Логин</label>
+      <input type="text" id="loginUser" value="admin" onkeydown="if(e&&e.key==='Enter')doLogin()">
+    </div>
+    <div class="login-field">
+      <label>Пароль</label>
+      <input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">ВОЙТИ</button>
+    <div class="login-err" id="loginErr">Неверный логин или пароль</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div>
+      <div class="topbar-logo"><span>Eco</span><span>Stroy</span></div>
+      <div class="topbar-badge">WAREHOUSE · MANAGEMENT</div>
+    </div>
+    <div class="topbar-time" id="clock">--:--:--</div>
+    <button class="topbar-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Выход</button>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div class="nav-section">Аналитика</div>
+      <div class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard">
+        <i class="fas fa-chart-line"></i> Дашборд
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Сайт</div>
+      <div class="nav-item" onclick="showPage('siteconstructor')" data-page="siteconstructor">
+        <i class="fas fa-layer-group"></i> Конструктор сайта
+      </div>
+      <div class="nav-item" onclick="showPage('sitecards')" data-page="sitecards">
+        <i class="fas fa-store"></i> Карточки сайта
+      </div>
+      <div class="nav-item" onclick="showPage('sitebanners')" data-page="sitebanners">
+        <i class="fas fa-bullhorn"></i> Баннеры/Акции
+      </div>
+      <div class="nav-item" onclick="showPage('siteinfo')" data-page="siteinfo">
+        <i class="fas fa-sliders-h"></i> Настройки сайта
+      </div>
+      <div class="nav-item" onclick="showPage('reviews')" data-page="reviews">
+        <i class="fas fa-star"></i> Отзывы
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Склад</div>
+      <div class="nav-item" onclick="showPage('products')" data-page="products">
+        <i class="fas fa-boxes"></i> Товары
+      </div>
+      <div class="nav-item" onclick="showPage('arrivals')" data-page="arrivals">
+        <i class="fas fa-truck-loading"></i> Приход товара
+      </div>
+      <div class="nav-item" onclick="showPage('history')" data-page="history">
+        <i class="fas fa-history"></i> История
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Логистика</div>
+      <div class="nav-item" onclick="showPage('gpstracker')" data-page="gpstracker" style="color:var(--green);position:relative;">
+        <i class="fas fa-satellite-dish"></i> GPS Трекер
+        <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:var(--red);color:white;font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:10px;animation:pulse 1.5s infinite;">LIVE</span>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Система</div>
+      <div class="nav-item" onclick="showPage('orders')" data-page="orders">
+        <i class="fas fa-shopping-cart"></i> Заказы с сайта
+      </div>
+      <div class="nav-item" onclick="showPage('sitestock')" data-page="sitestock">
+        <i class="fas fa-toggle-on"></i> Наличие на сайте
+      </div>
+      <div class="nav-item" onclick="showPage('fullcatalog')" data-page="fullcatalog">
+        <i class="fas fa-th-list"></i> Каталог товаров
+      </div>
+      <div class="nav-item" onclick="showPage('livepreview')" data-page="livepreview">
+        <i class="fas fa-eye"></i> Live Preview
+      </div>
+      <div class="nav-item" onclick="showPage('settings')" data-page="settings">
+        <i class="fas fa-cog"></i> Настройки
+      </div>
+    </div>
+
+    <div class="main">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-title">ДАШБОРД</div>
+        <div class="page-sub">ECOSTROY · ОБЗОР СИСТЕМЫ</div>
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <!-- Quick Actions -->
+        <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+          <button class="btn-add" onclick="showPage('arrivals')"><i class="fas fa-truck-loading"></i> Приход товара</button>
+          <button class="btn-add" style="background:linear-gradient(135deg,var(--blue),#6366f1);" onclick="showPage('sitecards')"><i class="fas fa-plus"></i> Добавить карточку</button>
+          <button class="btn-add" style="background:linear-gradient(135deg,var(--teal),#0d9488);" onclick="showPage('orders')"><i class="fas fa-shopping-cart"></i> Заказы с сайта</button>
+          <button class="btn-add" style="background:linear-gradient(135deg,var(--yellow),#d97706);" onclick="showPage('reviews')"><i class="fas fa-star"></i> Отзывы <span id="dashReviewBadge" style="background:rgba(255,255,255,0.3);border-radius:10px;padding:1px 6px;font-size:10px;"></span></button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap;" id="dashCharts">
+          <div class="tbl-wrap" style="padding:20px;">
+            <div style="font-size:12px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:14px;">⚠ КРИТИЧЕСКИ МАЛО (менее minQty)</div>
+            <div id="lowStockList"></div>
+          </div>
+          <div class="tbl-wrap" style="padding:20px;">
+            <div style="font-size:12px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:14px;">✅ ТОВАРЫ В НАЛИЧИИ</div>
+            <div id="inStockList"></div>
+          </div>
+        </div>
+
+        <!-- Recent orders from site -->
+        <div class="tbl-wrap" style="margin-top:20px;padding:20px;">
+          <div style="font-size:12px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:14px;">🛒 ПОСЛЕДНИЕ ЗАКАЗЫ С САЙТА</div>
+          <div id="dashOrdersList"></div>
+        </div>
+      </div>
+
+      <!-- SITE CARDS -->
+      <!-- SITE CONSTRUCTOR PAGE -->
+      <div class="page" id="page-siteconstructor">
+        <div class="page-title">КОНСТРУКТОР САЙТА</div>
+        <div class="page-sub">УПРАВЛЕНИЕ СЕКЦИЯМИ, ПОРЯДКОМ И ТЕКСТАМИ ГЛАВНОЙ СТРАНИЦЫ</div>
+
+        <!-- Hero section editor -->
+        <div class="settings-section" style="margin-bottom:18px;">
+          <div class="settings-title"><i class="fas fa-home"></i> Hero-блок (шапка)</div>
+          <div class="form-cols">
+            <div class="form-row"><label>Заголовок</label><input id="sc_hero_title" type="text" placeholder="EcoStroy — Ваш магазин"></div>
+            <div class="form-row"><label>Подзаголовок</label><input id="sc_hero_sub" type="text" placeholder="Строительные материалы в Ангрене"></div>
+          </div>
+          <div class="form-row"><label>Описание (приветствие)</label><textarea id="sc_hero_welcome" rows="3" placeholder="Более 500 товаров..."></textarea></div>
+          <div class="form-cols">
+            <div class="form-row"><label>Телефон</label><input id="sc_hero_phone" type="text" placeholder="+998 93 097-20-95"></div>
+            <div class="form-row"><label>Адрес</label><input id="sc_hero_address" type="text" placeholder="Ангрен, Узбекистан"></div>
+          </div>
+          <div class="form-row"><label>Telegram-ссылка</label><input id="sc_hero_telegram" type="text" placeholder="https://t.me/..."></div>
+          <button class="btn-save" style="width:auto;padding:10px 28px;margin-top:8px;" onclick="saveSiteConstructor()">
+            <i class="fas fa-save"></i> Сохранить и применить на сайте
+          </button>
+        </div>
+
+        <!-- Sections order & enabled -->
+        <div class="settings-section">
+          <div class="settings-title"><i class="fas fa-sort"></i> Порядок и видимость секций</div>
+          <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-bottom:14px;">Перетащите секцию для смены порядка. Переключите чтобы скрыть/показать на сайте.</div>
+          <div id="sectionsOrderList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <button class="btn-save" style="width:auto;padding:10px 28px;margin-top:14px;" onclick="saveSiteConstructor()">
+            <i class="fas fa-save"></i> Сохранить порядок секций
+          </button>
+        </div>
+      </div>
+
+      <div class="page" id="page-sitecards">
+        <div class="page-title">КАРТОЧКИ САЙТА</div>
+        <div class="page-sub">УПРАВЛЕНИЕ ТОВАРАМИ НА САЙТЕ</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+          <button class="btn-add" onclick="openCardModal()"><i class="fas fa-plus"></i> Добавить карточку</button>
+          <div style="font-size:12px;color:var(--text2);font-family:var(--mono);margin-left:8px;">
+            <i class="fas fa-info-circle" style="color:var(--green);"></i>
+            Товары «В наличии» отображаются первыми на сайте
+          </div>
+        </div>
+        <div class="cards-grid" id="siteCardsGrid"></div>
+      </div>
+
+      <!-- SITE BANNERS -->
+      <div class="page" id="page-sitebanners">
+        <div class="page-title">БАННЕРЫ И АКЦИИ</div>
+        <div class="page-sub">УПРАВЛЕНИЕ ПРОМО-МАТЕРИАЛАМИ</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px;">
+          <button class="btn-add" onclick="openBannerModal()"><i class="fas fa-plus"></i> Добавить баннер</button>
+        </div>
+        <div id="bannersGrid" style="display:flex;flex-direction:column;gap:12px;"></div>
+      </div>
+
+      <!-- SITE INFO -->
+      <div class="page" id="page-siteinfo">
+        <div class="page-title">НАСТРОЙКИ САЙТА</div>
+        <div class="page-sub">ИЗМЕНЕНИЕ КОНТЕНТА САЙТА</div>
+        <div class="settings-section">
+          <div class="settings-title"><i class="fas fa-store"></i> Информация о магазине</div>
+          <div class="form-cols">
+            <div class="form-row"><label>Название магазина</label><input id="si_title" type="text"></div>
+            <div class="form-row"><label>Подзаголовок</label><input id="si_sub" type="text"></div>
+          </div>
+          <div class="form-cols">
+            <div class="form-row"><label>Телефон</label><input id="si_phone" type="text"></div>
+            <div class="form-row"><label>Telegram</label><input id="si_telegram" type="text"></div>
+          </div>
+          <div class="form-row"><label>Приветственный текст</label><textarea id="si_welcome"></textarea></div>
+          <div class="form-row"><label>Адрес</label><input id="si_address" type="text"></div>
+          <button class="btn-save" style="width:auto;padding:11px 32px;" onclick="saveSiteInfo()">
+            <i class="fas fa-save"></i> Сохранить
+          </button>
+        </div>
+      </div>
+
+      <!-- PRODUCTS -->
+      <div class="page" id="page-products">
+        <div class="page-title">ТОВАРЫ</div>
+        <div class="page-sub">СКЛАДСКОЙ УЧЁТ · IN-STOCK ПЕРВЫМИ</div>
+        <div class="tbl-wrap">
+          <div class="tbl-toolbar">
+            <input class="tbl-search" type="text" placeholder="Поиск..." oninput="filterProducts(this.value)" id="productSearch">
+            <button class="btn-filter active" onclick="filterBrand('all',this)">Все</button>
+            <button class="btn-filter" onclick="filterBrand('ASLAN',this)">ASLAN</button>
+            <button class="btn-filter" onclick="filterBrand('OSCAR',this)">OSCAR</button>
+            <button class="btn-filter" onclick="filterBrand('TECHNO',this)">ТЕХНО</button>
+            <button class="btn-filter" onclick="filterBrand('GENERAL',this)">Общие</button>
+            <button class="btn-add" onclick="openProductModal()"><i class="fas fa-plus"></i> Добавить</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Название</th>
+                  <th>Бренд</th>
+                  <th>Кол-во</th>
+                  <th>Статус</th>
+                  <th>Цена (сум)</th>
+                  <th style="color:var(--red);">Скидка %</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="productsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ARRIVALS -->
+      <div class="page" id="page-arrivals">
+        <div class="page-title">ПРИХОД ТОВАРА</div>
+        <div class="page-sub">РЕГИСТРАЦИЯ ПОСТУПЛЕНИЙ</div>
+        <div class="arrival-form">
+          <div class="form-cols">
+            <div class="form-row">
+              <label>Товар</label>
+              <select id="arrProduct"></select>
+            </div>
+            <div class="form-row">
+              <label>Количество</label>
+              <input type="number" id="arrQty" value="1" min="1">
+            </div>
+          </div>
+          <div class="form-cols">
+            <div class="form-row">
+              <label>Цена прихода (сум)</label>
+              <input type="number" id="arrPrice" placeholder="0">
+            </div>
+            <div class="form-row">
+              <label>Поставщик</label>
+              <input type="text" id="arrSupplier" placeholder="Название поставщика">
+            </div>
+          </div>
+          <div class="form-row">
+            <label>Примечание</label>
+            <input type="text" id="arrNote" placeholder="Дополнительная информация">
+          </div>
+          <button class="btn-save" style="width:auto;padding:11px 32px;" onclick="processArrival()">
+            <i class="fas fa-truck-loading"></i> Оформить приход
+          </button>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="page" id="page-history">
+        <div class="page-title">ИСТОРИЯ</div>
+        <div class="page-sub">ЛОГ ВСЕХ ОПЕРАЦИЙ</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px;">
+          <button class="btn-add" onclick="exportHistory()"><i class="fas fa-download"></i> Экспорт CSV</button>
+          <button class="btn-cancel" style="padding:8px 16px;font-size:12px;" onclick="clearHistory()"><i class="fas fa-trash"></i> Очистить</button>
+        </div>
+        <div id="historyList"></div>
+      </div>
+
+      <!-- REVIEWS -->
+      <div class="page" id="page-reviews">
+        <div class="page-title">ОТЗЫВЫ</div>
+        <div class="page-sub">МОДЕРАЦИЯ ОТЗЫВОВ ПОКУПАТЕЛЕЙ</div>
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <button class="btn-filter active" onclick="filterReviews('all',this)" data-rfilt="all">Все</button>
+          <button class="btn-filter" onclick="filterReviews('pending',this)" data-rfilt="pending">На модерации</button>
+          <button class="btn-filter" onclick="filterReviews('approved',this)" data-rfilt="approved">Опубликованные</button>
+          <button class="btn-add" onclick="clearAllReviews()" style="margin-left:auto;background:none;border:1px solid var(--red);color:var(--red);">
+            <i class="fas fa-trash"></i> Удалить все
+          </button>
+        </div>
+        <div id="reviewsAdminList"></div>
+      </div>
+
+      <!-- ORDERS FROM SITE -->
+      <div class="page" id="page-orders">
+        <div class="page-title">ЗАКАЗЫ С САЙТА</div>
+        <div class="page-sub">ИСТОРИЯ ЗАКАЗОВ ПОКУПАТЕЛЕЙ</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+          <button class="btn-filter active" onclick="filterOrders('all',this)" data-ofilt="all">Все</button>
+          <button class="btn-filter" onclick="filterOrders('pending',this)" data-ofilt="pending">Ожидают</button>
+          <button class="btn-filter" onclick="filterOrders('done',this)" data-ofilt="done">Выполнены</button>
+          <button class="btn-add" onclick="exportOrders()" style="margin-left:auto;"><i class="fas fa-download"></i> Экспорт CSV</button>
+        </div>
+        <div id="ordersList"></div>
+      </div>
+
+      <!-- LIVE PREVIEW -->
+      <div class="page" id="page-livepreview">
+        <div class="page-title">LIVE PREVIEW</div>
+        <div class="page-sub">ПРЕДПРОСМОТР САЙТА · ЧТО ВИДИТ ПОКУПАТЕЛЬ</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:12px;color:var(--text2);font-family:var(--mono);"><i class="fas fa-info-circle" style="color:var(--green);"></i> Предпросмотр показывает данные из localStorage в реальном времени</div>
+          <button class="btn-add" onclick="refreshPreview()" style="margin-left:auto;"><i class="fas fa-sync-alt"></i> Обновить</button>
+        </div>
+        <div id="livePreviewContainer" style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.3);min-height:500px;">
+          <div id="livePreviewContent" style="padding:20px;"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════ -->
+      <!-- GPS TRACKER                                            -->
+      <!-- ══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-gpstracker">
+        <div class="page-title">GPS ТРЕКЕР</div>
+        <div class="page-sub">КУРЬЕРЫ И ПОСТАВЩИКИ · LIVE ОТСЛЕЖИВАНИЕ · АНГРЕН</div>
+
+        <!-- Top stats -->
+        <div class="stats-grid" style="margin-bottom:20px;" id="gpsStatsGrid"></div>
+
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start;">
+
+          <!-- LEFT: agent list -->
+          <div>
+            <!-- Add agent -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px;">
+              <div style="font-size:12px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:12px;">+ ДОБАВИТЬ АГЕНТА</div>
+              <div class="form-row" style="margin-bottom:10px;">
+                <input id="gps_name" placeholder="Имя курьера / поставщика" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px 12px;font-size:13px;font-family:var(--mono);border-radius:4px;outline:none;">
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <select id="gps_type" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;font-size:12px;font-family:var(--mono);border-radius:4px;outline:none;">
+                  <option value="courier">🛵 Курьер</option>
+                  <option value="supplier">🚛 Поставщик</option>
+                  <option value="car">🚗 Авто</option>
+                </select>
+                <input id="gps_phone" placeholder="+998..." style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;font-size:12px;font-family:var(--mono);border-radius:4px;outline:none;">
+              </div>
+              <button onclick="gpsAddAgent()" style="width:100%;background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:white;padding:9px;font-size:12px;font-family:var(--mono);font-weight:700;border-radius:4px;cursor:pointer;letter-spacing:1px;">ДОБАВИТЬ</button>
+            </div>
+
+            <!-- Agents list -->
+            <div id="gpsAgentList" style="display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;"></div>
+          </div>
+
+          <!-- RIGHT: map + event log -->
+          <div>
+            <!-- Map toolbar -->
+            <div style="display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+              <div style="font-size:12px;font-family:var(--mono);color:var(--text2);display:flex;align-items:center;gap:6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:markerPulse 1.5s infinite;"></span>
+                LIVE КАРТА · Ангрен, Узбекистан
+              </div>
+              <button onclick="gpsCenterMap()" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);padding:6px 14px;font-size:11px;font-family:var(--mono);border-radius:4px;cursor:pointer;">
+                <i class="fas fa-compress-arrows-alt"></i> Центр
+              </button>
+              <button onclick="gpsSimulateAll()" style="background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:white;padding:6px 14px;font-size:11px;font-family:var(--mono);font-weight:700;border-radius:4px;cursor:pointer;">
+                <i class="fas fa-play"></i> Симуляция
+              </button>
+            </div>
+
+            <!-- Leaflet Map -->
+            <div id="gpsMap"></div>
+
+            <!-- Event log -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:14px;padding:16px;">
+              <div style="font-size:11px;font-family:var(--mono);color:var(--text3);letter-spacing:1.5px;margin-bottom:10px;">📡 ЖУРНАЛ СОБЫТИЙ</div>
+              <div id="gpsEventLog" style="max-height:180px;overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="page-title">НАСТРОЙКИ</div>
+        <div class="page-sub">БЕЗОПАСНОСТЬ · СИСТЕМА</div>
+        <div class="settings-section">
+          <div class="settings-title"><i class="fas fa-lock"></i> Смена пароля</div>
+          <div class="form-cols">
+            <div class="form-row"><label>Текущий пароль</label><input type="password" id="pwdCurrent"></div>
+            <div class="form-row"><label>Новый пароль</label><input type="password" id="pwdNew"></div>
+          </div>
+          <button class="btn-save" style="width:auto;padding:11px 32px;" onclick="changePassword()">
+            <i class="fas fa-save"></i> Сменить пароль
+          </button>
+        </div>
+        <div class="settings-section">
+          <div class="settings-title"><i class="fas fa-database"></i> Данные</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-add" onclick="exportAllData()"><i class="fas fa-download"></i> Экспорт всех данных</button>
+            <button class="btn-cancel" style="padding:8px 16px;font-size:12px;" onclick="resetWarehouse()"><i class="fas fa-redo"></i> Сбросить склад</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-sitestock">
+        <div class="page-title">НАЛИЧИЕ НА САЙТЕ</div>
+        <div class="page-sub">УПРАВЛЕНИЕ НАЛИЧИЕМ И ЦЕНАМИ ВСЕХ ТОВАРОВ САЙТА</div>
+
+        <!-- Stats bar -->
+        <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+          <div style="font-size:28px;">🛒</div>
+          <div>
+            <div id="ss-stats" style="color:white;font-weight:800;font-size:16px;">0 из 0 товаров в наличии</div>
+            <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px;">Товары со статусом "В наличии" автоматически показываются первыми на сайте</div>
+          </div>
+        </div>
+
+        <!-- Search + Filters -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+          <input type="text" placeholder="🔍 Поиск товара..." oninput="searchSiteStock(this.value)"
+            style="flex:1;min-width:200px;border:1.5px solid #e2e8f0;border-radius:10px;padding:9px 14px;font-size:13px;font-family:inherit;outline:none;">
+          <style>
+            .ss-filter-btn { border:none;border-radius:10px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s; }
+            .ss-filter-btn.ss-active { box-shadow:0 0 0 3px rgba(0,0,0,0.25);transform:scale(1.04); }
+          </style>
+          <button class="ss-filter-btn ss-active" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;" onclick="filterSiteStock('all',this)">Все</button>
+          <button class="ss-filter-btn" style="background:linear-gradient(135deg,#a0bd41,#7fa032);color:white;" onclick="filterSiteStock('aslan',this)">ASLAN</button>
+          <button class="ss-filter-btn" style="background:linear-gradient(135deg,#0d9488,#0f766e);color:white;" onclick="filterSiteStock('oscar',this)">OSCAR</button>
+          <button class="ss-filter-btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:white;" onclick="filterSiteStock('instock',this)">✅ В наличии</button>
+        </div>
+
+        <div id="sitestockGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;"></div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════ -->
+      <!-- КАТАЛОГ ТОВАРОВ — Полное управление                    -->
+      <!-- ══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-fullcatalog">
+        <div class="page-title">КАТАЛОГ ТОВАРОВ</div>
+        <div class="page-sub">ПОЛНОЕ УПРАВЛЕНИЕ ЦЕНАМИ И НАЛИЧИЕМ ВСЕХ ТОВАРОВ САЙТА</div>
+
+        <!-- Top stats + actions -->
+        <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:10px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="font-size:32px;">📦</div>
+          <div style="flex:1;min-width:160px;">
+            <div id="fc-lbl-total" style="color:white;font-weight:800;font-size:16px;">Загрузка...</div>
+            <div id="fc-lbl-stock" style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px;font-family:var(--mono);"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="fcSaveAll()" style="background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:white;padding:9px 18px;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;" title="Сохранить все цены">💾 СОХРАНИТЬ</button>
+            <button onclick="fcSetAll(true)" style="background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:white;padding:9px 14px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;">✅ Все в наличии</button>
+            <button onclick="fcSetAll(false)" style="background:linear-gradient(135deg,#ef4444,#dc2626);border:none;color:white;padding:9px 14px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;">❌ Убрать все</button>
+          </div>
+        </div>
+
+        <!-- Search + Brand filters -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+          <input id="fc-search" type="text" placeholder="🔍 Поиск по названию, ID, категории..."
+            oninput="fcRender()"
+            style="flex:1;min-width:200px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 14px;font-size:13px;font-family:var(--mono);border-radius:6px;outline:none;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="fc-brand-btns">
+            <button id="fcbtn-all"     onclick="fcFilter('all')"     class="btn-filter active">Все</button>
+            <button id="fcbtn-aslan"   onclick="fcFilter('aslan')"   class="btn-filter" style="color:#a0bd41;border-color:#a0bd41;">ASLAN</button>
+            <button id="fcbtn-oscar"   onclick="fcFilter('oscar')"   class="btn-filter" style="color:var(--teal);border-color:var(--teal);">OSCAR</button>
+            <button id="fcbtn-techno"  onclick="fcFilter('techno')"  class="btn-filter" style="color:#3b82f6;border-color:#3b82f6;">ТЕХНОНИКОЛЬ</button>
+            <button id="fcbtn-general" onclick="fcFilter('general')" class="btn-filter" style="color:#22c55e;border-color:#22c55e;">СТРОЙМАТЕРИАЛЫ</button>
+            <button id="fcbtn-instock" onclick="fcFilter('instock')" class="btn-filter" style="color:#f59e0b;border-color:#f59e0b;">✅ В наличии</button>
+          </div>
+        </div>
+
+        <!-- Products table -->
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:52px;">Фото</th>
+                <th>Название</th>
+                <th style="width:65px;">ID</th>
+                <th style="width:100px;">Бренд</th>
+                <th style="width:120px;">Цена (сум) <span style="color:var(--green);font-size:9px;">↓редакт.</span></th>
+                <th style="width:90px;">Скидка %</th>
+                <th style="width:120px;">Статус</th>
+                <th style="width:75px;">Кол-во</th>
+                <th style="width:75px;">Приоритет</th>
+              </tr>
+            </thead>
+            <tbody id="fcBody" style="font-size:13px;"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+          <button onclick="fcSaveAll()" style="background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:white;padding:10px 24px;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">💾 СОХРАНИТЬ ВСЕ ИЗМЕНЕНИЯ</button>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /layout -->
+</div><!-- /app -->
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- GPS TRACKER PAGE — injected into main via showPage            -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+
+<!-- PRODUCT MODAL -->
+<div class="modal-bg" id="productModal">
+  <div class="modal">
+    <div class="modal-title" id="productModalTitle">ДОБАВИТЬ ТОВАР</div>
+    <div class="form-cols">
+      <div class="form-row"><label>Название</label><input id="pm_name" type="text"></div>
+      <div class="form-row">
+        <label>Бренд</label>
+        <select id="pm_brand">
+          <option value="ASLAN">ASLAN</option>
+          <option value="OSCAR">OSCAR</option>
+          <option value="GENERAL">Общий</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row"><label>Описание</label><textarea id="pm_desc"></textarea></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Категория</label><input id="pm_cat" type="text"></div>
+      <div class="form-row"><label>Единица</label><input id="pm_unit" type="text" value="мешок"></div>
+    </div>
+    <div class="form-cols">
+      <div class="form-row"><label>Количество</label><input id="pm_qty" type="number" value="0" min="0"></div>
+      <div class="form-row"><label>Мин. запас</label><input id="pm_minQty" type="number" value="20" min="0"></div>
+    </div>
+    <div class="form-cols">
+      <div class="form-row"><label>Цена (сум)</label><input id="pm_price" type="number" value="0" min="0" oninput="pmPreviewDiscount()"></div>
+      <div class="form-row"><label>Старая цена (сум)</label><input id="pm_oldPrice" type="number" value="0" min="0"></div>
+    </div>
+    <div class="form-row">
+      <label>Скидка % <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">(авто-вычисляет итоговую цену)</span></label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <input id="pm_discount" type="number" value="0" min="0" max="99" oninput="pmPreviewDiscount()" style="width:90px;flex-shrink:0;">
+        <div id="pm_discount_preview" style="font-size:12px;color:var(--green);font-family:var(--mono);"></div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-save" onclick="saveProduct()">СОХРАНИТЬ</button>
+      <button class="btn-cancel" onclick="closeModal('productModal')">Отмена</button>
+    </div>
+    <input type="hidden" id="pm_id">
+  </div>
+</div>
+
+<!-- SITE CARD MODAL -->
+<div class="modal-bg" id="cardModal">
+  <div class="modal">
+    <div class="modal-title" id="cardModalTitle">ДОБАВИТЬ КАРТОЧКУ</div>
+    <div class="form-row"><label>Название товара</label><input id="cm_name" type="text"></div>
+    <div class="form-row"><label>Описание</label><textarea id="cm_desc" rows="3"></textarea></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Цена (сум)</label><input id="cm_price" type="number" min="0"></div>
+      <div class="form-row"><label>Старая цена (сум)</label><input id="cm_oldPrice" type="number" min="0" placeholder="0 = не показывать"></div>
+    </div>
+    <div class="form-row">
+      <label>URL изображения</label>
+      <input id="cm_image" type="text" placeholder="https://..." oninput="previewCardImg(this.value)">
+      <img id="cm_preview" class="img-preview" alt="preview">
+    </div>
+    <div class="form-row">
+      <label>Статус</label>
+      <select id="cm_inStock">
+        <option value="1">✅ В наличии</option>
+        <option value="0">❌ Нет в наличии</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Категория / Раздел</label><input id="cm_category" type="text" placeholder="Например: ASLAN, OSCAR, Строй..."></div>
+    <div class="modal-btns">
+      <button class="btn-save" onclick="saveCard()">СОХРАНИТЬ</button>
+      <button class="btn-cancel" onclick="closeModal('cardModal')">Отмена</button>
+    </div>
+    <input type="hidden" id="cm_id">
+  </div>
+</div>
+
+<!-- BANNER MODAL -->
+<div class="modal-bg" id="bannerModal">
+  <div class="modal">
+    <div class="modal-title" id="bannerModalTitle">ДОБАВИТЬ БАННЕР</div>
+    <div class="form-cols">
+      <div class="form-row"><label>Заголовок</label><input id="bm_title" type="text"></div>
+      <div class="form-row"><label>Подзаголовок</label><input id="bm_sub" type="text"></div>
+    </div>
+    <div class="form-row"><label>Текст</label><textarea id="bm_text" rows="3"></textarea></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Цвет фона (CSS)</label><input id="bm_bg" type="text" placeholder="linear-gradient(...)"></div>
+      <div class="form-row"><label>Иконка (emoji)</label><input id="bm_icon" type="text" placeholder="🔥"></div>
+    </div>
+    <div class="form-cols">
+      <div class="form-row"><label>Текст кнопки 1</label><input id="bm_btn1" type="text" placeholder="Позвонить"></div>
+      <div class="form-row"><label>Ссылка кнопки 1</label><input id="bm_link1" type="text" placeholder="tel:+998..."></div>
+    </div>
+    <div class="form-row"><label>Активен</label>
+      <select id="bm_active">
+        <option value="1">✅ Активен</option>
+        <option value="0">❌ Скрыт</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-save" onclick="saveBanner()">СОХРАНИТЬ</button>
+      <button class="btn-cancel" onclick="closeModal('bannerModal')">Отмена</button>
+    </div>
+    <input type="hidden" id="bm_id">
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// DATABASE
+// ============================================================
+let db = { products:[], history:[], siteCards:[], banners:[], siteInfo:{}, siteConfig:{}, productOverrides:{}, nextId:1 };
+const DB_KEY = 'ecostroy_db_v2';
+const PASS_KEY = 'ecostroy_pass';
+
+function loadDB() {
+  const raw = localStorage.getItem(DB_KEY);
+  if (raw) {
+    try { db = JSON.parse(raw); } catch(e){}
+  } else {
+    initDefaultData();
+    saveDB();
+  }
+  if (!db.siteCards) db.siteCards = [];
+  if (!db.banners) db.banners = initDefaultBanners();
+  if (!db.siteInfo) db.siteInfo = initDefaultSiteInfo();
+  if (!db.siteConfig) db.siteConfig = initDefaultSiteConfig();
+  if (!db.productOverrides) db.productOverrides = {};
+  if (!db.nextId) db.nextId = db.products.length + 100;
+  syncToSite(); // ensure site always has latest data on load
+}
+
+function saveDB() {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  // Sync to warehouse_db so the site immediately sees all changes
+  syncToSite();
+}
+
+function syncToSite() {
+  // Build a combined object the site can read directly
+  const siteData = {
+    products: SITE_CATALOG,
+    overrides: db.productOverrides || {},
+    siteInfo: db.siteInfo || {},
+    siteConfig: db.siteConfig || {},
+    banners: (db.banners || []).filter(b => b.active),
+    updatedAt: Date.now()
+  };
+  try { localStorage.setItem('ecostroy_site_data', JSON.stringify(siteData)); } catch(e){}
+  // Write warehouse_db — new index reads this for stock/price sync
+  try {
+    // Include db.products (ASLAN/OSCAR/TECHNO/GENERAL warehouse items)
+    const wdbProducts = (db.products || []).map(p => ({
+      id: p.id, name: p.name, qty: p.qty || 0,
+      price: p.price || 0, discount: p.discount || 0,
+      brand: p.brand, category: p.cat
+    }));
+    localStorage.setItem('warehouse_db', JSON.stringify({ products: wdbProducts, history: [] }));
+  } catch(e){}
+}
+
+function initDefaultSiteConfig() {
+  return {
+    sectionsOrder: ['hero','banners','categories','featured','products','reviews','contacts'],
+    sectionsEnabled: {
+      hero: true, banners: true, categories: true,
+      featured: true, products: true, reviews: true, contacts: true
+    },
+    sectionTitles: {
+      categories: 'Категории', featured: 'Популярные товары',
+      products: 'Все товары', reviews: 'Отзывы', contacts: 'Контакты'
+    }
+  };
+}
+
+function getPass() {
+  return localStorage.getItem(PASS_KEY) || 'ecostroy2024';
+}
+
+function initDefaultData() {
+  db.products = [];
+  let id = 1;
+  const aslan = [
+    {name:'SPREY SUVOQ',desc:'Машинная гипсовая штукатурка для всех поверхностей',cat:'Штукатурка',price:45200,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'IZO-SUVOQ',desc:'Штукатурка для изоляционных плит (пенопласт, минвата)',cat:'Штукатурка',price:45000,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'ROTSUVOQ',desc:'Перлитовая гипсовая штукатурка для стен и потолков',cat:'Штукатурка',price:43300,qty:400,minQty:50,unit:'мешок',brand:'ASLAN'},
+    {name:'GIPS DECOR',desc:'Декоративные гипсы для литья и отделки',cat:'Декор',price:30000,qty:0,minQty:15,unit:'мешок',brand:'ASLAN'},
+    {name:'SATEN',desc:'Гипсовая шпаклёвка. Слой 1 мм, расход 1 кг/м²',cat:'Шпаклёвка',price:36000,qty:0,minQty:30,unit:'мешок',brand:'ASLAN'},
+    {name:'PRO SATEN',desc:'Профессиональная гипсовая шпаклёвка. Улучшенный состав',cat:'Шпаклёвка',price:36000,qty:100,minQty:30,unit:'мешок',brand:'ASLAN'},
+    {name:'SUPER FINISH',desc:'Финишная шпаклёвка. Слой 0,5–0,6 мм, без грунтовки',cat:'Шпаклёвка',price:36000,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'FUGA GIPS',desc:'Универсальная гипсовая шпаклёвка для всех поверхностей',cat:'Шпаклёвка',price:50830,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'BOARD-FIX',desc:'Клей для гипсокартонных плит к стенам. 5 кг/м²',cat:'Клей',price:35000,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'CERA-FIX',desc:'Клей для керамической плитки. Прочность 0,5 МПа',cat:'Клей',price:37000,qty:0,minQty:25,unit:'мешок',brand:'ASLAN'},
+    {name:'CERA-FIX PLUS+',desc:'Усиленный клей для плитки в сложных условиях',cat:'Клей',price:40000,qty:300,minQty:25,unit:'мешок',brand:'ASLAN'},
+    {name:'GRANITE-FIX',desc:'Клей для гранита, мрамора и травертина',cat:'Клей',price:43000,qty:0,minQty:15,unit:'мешок',brand:'ASLAN'},
+    {name:'BLOK_FIX',desc:'Клей для укладки газобетонных блоков. Шов 1–3 мм',cat:'Клей',price:37500,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'SUVOQ',desc:'Универсальная цементная штукатурка для стен',cat:'Штукатурка',price:40500,qty:0,minQty:30,unit:'мешок',brand:'ASLAN'},
+    {name:'FASAD SUVOQ',desc:'Фасадная шпаклёвка на цементной основе. Водостойкая',cat:'Штукатурка',price:40000,qty:0,minQty:20,unit:'мешок',brand:'ASLAN'},
+    {name:'COAT EX',desc:'Наружная штукатурка. Морозостойкая и водостойкая',cat:'Штукатурка',price:45500,qty:0,minQty:15,unit:'мешок',brand:'ASLAN'},
+    {name:'BETONCHI',desc:'Отвердитель поверхности пола. Прочность 50–70 Н/мм²',cat:'Пол',price:53500,qty:0,minQty:10,unit:'мешок',brand:'ASLAN'},
+    {name:'POL-TEK',desc:'Наливной пол самовыравнивающийся. Слой 1–100 мм',cat:'Пол',price:254000,qty:0,minQty:5,unit:'мешок',brand:'ASLAN'},
+    {name:'BETO-KONTAKT',desc:'Бетоноконтакт. Синий цвет. Для грунтования стен',cat:'Грунтовка',price:115000,qty:0,minQty:10,unit:'вёдра',brand:'ASLAN'},
+    {name:'AKRILIK ASTAR',desc:'Акриловая грунтовка для полов и бетонных оснований',cat:'Грунтовка',price:92000,qty:0,minQty:10,unit:'вёдра',brand:'ASLAN'},
+  ];
+  const oscar = [
+    {name:'Эмаль Оскар 2.4кг',desc:'Алкидная эмаль универсальная 2.4 кг',cat:'Эмаль',price:85000,qty:50,minQty:10,unit:'банка',brand:'OSCAR'},
+    {name:'Эмаль Оскар 0.7кг',desc:'Алкидная эмаль универсальная 0.7 кг',cat:'Эмаль',price:32000,qty:80,minQty:15,unit:'банка',brand:'OSCAR'},
+    {name:'Oscar Deluxe',desc:'Эмаль Делюкс повышенная износостойкость',cat:'Эмаль',price:95000,qty:0,minQty:8,unit:'банка',brand:'OSCAR'},
+    {name:'Нитроэмаль НЦ',desc:'Нитроэмаль быстросохнущая',cat:'Эмаль',price:45000,qty:0,minQty:10,unit:'банка',brand:'OSCAR'},
+    {name:'Эмульсия Universal',desc:'Водоэмульсионная краска универсальная',cat:'Краска',price:120000,qty:30,minQty:10,unit:'вёдра',brand:'OSCAR'},
+    {name:'Антимороз',desc:'Противоморозная добавка в бетон и раствор',cat:'Добавки',price:25000,qty:0,minQty:20,unit:'шт',brand:'OSCAR'},
+    {name:'Олифа',desc:'Олифа оксоль для грунтования дерева',cat:'Пропитка',price:38000,qty:0,minQty:10,unit:'банка',brand:'OSCAR'},
+    {name:'Эмаль X-tra',desc:'Эмаль X-tra повышенной стойкости',cat:'Эмаль',price:110000,qty:0,minQty:8,unit:'банка',brand:'OSCAR'},
+    {name:'Oscar Deluxe голубая',desc:'Oscar Deluxe голубой оттенок',cat:'Эмаль',price:98000,qty:0,minQty:8,unit:'банка',brand:'OSCAR'},
+    {name:'Эмульсия Асос',desc:'Интерьерная акриловая краска',cat:'Краска',price:140000,qty:0,minQty:8,unit:'вёдра',brand:'OSCAR'},
+  ];
+  const techno = [
+    {name:'XPS CARBON ECO',desc:'Экструзионный пенополистирол CARBON ECO — универсальный утеплитель',cat:'Утеплитель',price:0,qty:0,minQty:1,unit:'м²',brand:'TECHNO'},
+    {name:'XPS CARBON ECO FAS',desc:'CARBON ECO FAS — для фасадных систем, без штукатурки',cat:'Утеплитель',price:0,qty:0,minQty:1,unit:'м²',brand:'TECHNO'},
+    {name:'XPS CARBON PROF',desc:'CARBON PROF — профессиональный для кровли и пола',cat:'Утеплитель',price:0,qty:0,minQty:1,unit:'м²',brand:'TECHNO'},
+  ];
+  const general = [
+    {name:'Штукатурка гипсовая',desc:'Гипсовая штукатурка 25кг, для стен и потолков',cat:'Стройматериалы',price:27000,qty:0,minQty:10,unit:'мешок',brand:'GENERAL'},
+    {name:'Плиточный клей',desc:'Плиточный клей 25кг, для всех видов плитки',cat:'Стройматериалы',price:27000,qty:0,minQty:10,unit:'мешок',brand:'GENERAL'},
+    {name:'Песок строительный',desc:'Строительный песок сеяный, мешок',cat:'Стройматериалы',price:7500,qty:0,minQty:5,unit:'мешок',brand:'GENERAL'},
+  ];
+  [...aslan, ...oscar, ...techno, ...general].forEach(p => {
+    db.products.push({ id: id++, ...p });
+  });
+  db.nextId = id;
+  db.siteCards = [];
+  db.history = [];
+}
+
+function initDefaultBanners() {
+  return [
+    { id:1, title:'Горячие предложения', sub:'Только сегодня', text:'Скидки на стройматериалы! Акции на товары ASLAN и OSCAR.', bg:'linear-gradient(135deg,#7f1d1d,#ef4444)', icon:'🔥', btn1:'Смотреть товары', link1:'#', active:true },
+    { id:2, title:'Возврат товаров', sub:'Гарантия качества', text:'Если товар не подошёл — заберём и вернём деньги.', bg:'linear-gradient(135deg,#1e3a5f,#2563eb)', icon:'↩️', btn1:'Позвонить', link1:'tel:+998932234122', active:true },
+    { id:3, title:'Вывоз остатков', sub:'Быстрый вывоз', text:'Остались лишние материалы? Мы приедем и заберём!', bg:'linear-gradient(135deg,#14532d,#16a34a)', icon:'🚛', btn1:'Позвонить', link1:'tel:+998932234122', active:true },
+  ];
+}
+
+function initDefaultSiteInfo() {
+  return {
+    title: 'EcoStroy — Ваш магазин',
+    sub: 'Строительные материалы в Ангрене',
+    welcome: 'Более 500 товаров от проверенных брендов. Быстрая доставка по городу за 24 часа. Работаем с 8:00 до 20:00 каждый день.',
+    phone: '+998 93 097-20-95',
+    telegram: 'https://t.me/EcoStrooybot',
+    address: 'Ангрен, Узбекистан'
+  };
+}
+
+// ============================================================
+// SITE CONSTRUCTOR
+// ============================================================
+const SECTION_LABELS = {
+  hero: '🏠 Hero-блок (шапка)',
+  banners: '📢 Баннеры / Акции',
+  categories: '📂 Категории',
+  featured: '⭐ Популярные товары',
+  products: '📦 Все товары',
+  reviews: '💬 Отзывы',
+  contacts: '📞 Контакты'
+};
+
+function loadSiteConstructorForm() {
+  const cfg = db.siteConfig || {};
+  const si = db.siteInfo || {};
+  // Hero fields
+  document.getElementById('sc_hero_title').value = si.title || '';
+  document.getElementById('sc_hero_sub').value = si.sub || '';
+  document.getElementById('sc_hero_welcome').value = si.welcome || '';
+  document.getElementById('sc_hero_phone').value = si.phone || '';
+  document.getElementById('sc_hero_address').value = si.address || '';
+  document.getElementById('sc_hero_telegram').value = si.telegram || '';
+  // Sections order
+  renderSectionsOrderList();
+}
+
+let _dragSrcIdx = null;
+
+function renderSectionsOrderList() {
+  const cfg = db.siteConfig || initDefaultSiteConfig();
+  const order = cfg.sectionsOrder || ['hero','banners','categories','featured','products','reviews','contacts'];
+  const enabled = cfg.sectionsEnabled || {};
+  const list = document.getElementById('sectionsOrderList');
+  if (!list) return;
+  list.innerHTML = order.map((sec, idx) => `
+    <div class="section-row" draggable="true"
+      ondragstart="_dragSrcIdx=${idx}"
+      ondragover="event.preventDefault()"
+      ondrop="reorderSection(${idx})"
+      style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;
+             display:flex;align-items:center;gap:14px;cursor:grab;user-select:none;
+             ${enabled[sec]!==false?'border-left:3px solid var(--green);':'border-left:3px solid var(--red);opacity:.7;'}">
+      <i class="fas fa-grip-vertical" style="color:var(--text3);"></i>
+      <span style="flex:1;font-size:13px;color:var(--text);">${SECTION_LABELS[sec]||sec}</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);font-family:var(--mono);">
+        <input type="checkbox" ${enabled[sec]!==false?'checked':''} onchange="toggleSection('${sec}',this.checked)"
+          style="width:16px;height:16px;accent-color:var(--green);">
+        ${enabled[sec]!==false?'Включена':'Скрыта'}
+      </label>
+    </div>
+  `).join('');
+}
+
+function reorderSection(targetIdx) {
+  if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) { _dragSrcIdx = null; return; }
+  const cfg = db.siteConfig;
+  const arr = cfg.sectionsOrder;
+  const [moved] = arr.splice(_dragSrcIdx, 1);
+  arr.splice(targetIdx, 0, moved);
+  _dragSrcIdx = null;
+  saveDB();
+  renderSectionsOrderList();
+  showToast('Порядок секций обновлён ✓', 'ok');
+}
+
+function toggleSection(sec, val) {
+  if (!db.siteConfig.sectionsEnabled) db.siteConfig.sectionsEnabled = {};
+  db.siteConfig.sectionsEnabled[sec] = val;
+  saveDB();
+  renderSectionsOrderList();
+  showToast((val ? '✅ Секция включена: ' : '❌ Секция скрыта: ') + (SECTION_LABELS[sec]||sec), val?'ok':'warn');
+}
+
+function saveSiteConstructor() {
+  db.siteInfo = {
+    title: document.getElementById('sc_hero_title').value.trim() || db.siteInfo.title,
+    sub: document.getElementById('sc_hero_sub').value.trim() || db.siteInfo.sub,
+    welcome: document.getElementById('sc_hero_welcome').value.trim(),
+    phone: document.getElementById('sc_hero_phone').value.trim(),
+    telegram: document.getElementById('sc_hero_telegram').value.trim(),
+    address: document.getElementById('sc_hero_address').value.trim(),
+  };
+  saveDB();
+  // also update siteinfo form for consistency
+  loadSiteInfoForm();
+  showToast('✅ Конструктор сайта сохранён! Изменения применены.', 'ok');
+}
+
+
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  if (u === 'admin' && p === getPass()) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadDB();
+    startClock();
+    renderAll();
+    loadArrivalSelect();
+    loadSiteInfoForm();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+
+function doLogout() {
+  saveDB();
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginErr').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function startClock() {
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ru-RU') + ' · ' + now.toLocaleDateString('ru-RU');
+  }, 1000);
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`[data-page="${name}"]`).classList.add('active');
+
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'products') renderProducts();
+  if (name === 'sitecards') renderSiteCards();
+  if (name === 'sitebanners') renderBanners();
+  if (name === 'history') renderHistory();
+  if (name === 'arrivals') loadArrivalSelect();
+  if (name === 'siteconstructor') loadSiteConstructorForm();
+  if (name === 'siteinfo') loadSiteInfoForm();
+  if (name === 'siteinfo') loadSiteInfoForm();
+  if (name === 'reviews') renderReviewsAdmin();
+  if (name === 'orders') renderOrders();
+  if (name === 'livepreview') renderLivePreview();
+  if (name === 'gpstracker') initGPSTracker();
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderAll() { renderDashboard(); renderProducts(); renderSiteCards(); renderBanners(); renderHistory(); syncToSite(); }
+
+function getSiteOrders() {
+  try { return JSON.parse(localStorage.getItem('ecostroy_order_history') || '[]'); } catch(e) { return []; }
+}
+
+function renderDashboard() {
+  const total = db.products.length;
+  const inStock = db.products.filter(p => p.qty > 0).length;
+  const outStock = db.products.filter(p => p.qty === 0).length;
+  const lowStock = db.products.filter(p => p.qty > 0 && p.qty < p.minQty).length;
+  const siteCards = db.siteCards.length;
+  const siteInStock = db.siteCards.filter(c => c.inStock).length;
+  const orders = getSiteOrders();
+  const pendingReviews = getReviews().filter(r => !r.approved).length;
+
+  // Update quick action review badge
+  const rb = document.getElementById('dashReviewBadge');
+  if (rb) rb.textContent = pendingReviews > 0 ? pendingReviews : '';
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card green">
+      <div class="stat-val">${total}</div>
+      <div class="stat-label">Всего товаров</div>
+    </div>
+    <div class="stat-card teal">
+      <div class="stat-val">${inStock}</div>
+      <div class="stat-label">В наличии</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-val">${outStock}</div>
+      <div class="stat-label">Нет в наличии</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-val">${lowStock}</div>
+      <div class="stat-label">Мало на складе</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-val">${siteCards}</div>
+      <div class="stat-label">Карточки сайта</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-val">${orders.length}</div>
+      <div class="stat-label">Заказов с сайта</div>
+    </div>
+  `;
+
+  // Low stock list
+  const lows = db.products.filter(p => p.qty > 0 && p.qty < p.minQty).slice(0,8);
+  document.getElementById('lowStockList').innerHTML = lows.length ? lows.map(p => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <div>
+        <span style="color:var(--text);font-weight:600;">${p.name}</span>
+        <span style="color:var(--text3);margin-left:6px;font-family:var(--mono);">${p.brand||''}</span>
+      </div>
+      <span style="font-family:var(--mono);color:var(--yellow);">${p.qty}/${p.minQty}</span>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;">Всё в порядке ✓</div>';
+
+  // In-stock list (sorted in-stock first)
+  const inStockProducts = getSortedProducts().filter(p => p.qty > 0).slice(0,8);
+  document.getElementById('inStockList').innerHTML = inStockProducts.length ? inStockProducts.map(p => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <div>
+        <span style="color:var(--text);font-weight:600;">${p.name}</span>
+        <span style="color:var(--text3);margin-left:6px;font-family:var(--mono);">${p.brand||''}</span>
+      </div>
+      <span style="font-family:var(--mono);color:var(--green);">${p.qty} ${p.unit||''}</span>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;">Нет товаров в наличии</div>';
+
+  // Recent orders
+  const dashOrders = document.getElementById('dashOrdersList');
+  if (dashOrders) {
+    const recent = orders.slice(-5).reverse();
+    dashOrders.innerHTML = recent.length ? recent.map(o => {
+      const d = new Date(o.date || o.ts || o.createdAt || Date.now());
+      const total = (o.items||[]).reduce((s,i) => s + (i.price||0)*(i.quantity||1), 0);
+      const name = o.customerName || o.name || 'Покупатель';
+      const phone = o.customerPhone || o.phone || '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <div>
+          <div style="font-weight:600;color:var(--text);">${name} ${phone ? '· '+phone : ''}</div>
+          <div style="color:var(--text3);font-family:var(--mono);margin-top:2px;">${(o.items||[]).map(i=>i.name||'?').join(', ').slice(0,60)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--mono);color:var(--green);font-weight:700;">${total ? total.toLocaleString('ru')+' сум' : '—'}</div>
+          <div style="color:var(--text3);font-size:10px;">${d.toLocaleDateString('ru-RU')}</div>
+        </div>
+      </div>`;
+    }).join('') : '<div style="color:var(--text3);font-family:var(--mono);font-size:12px;">Нет заказов с сайта</div>';
+  }
+}
+
+// ============================================================
+// PRODUCTS — IN-STOCK FIRST SORT
+// ============================================================
+let currentBrandFilter = 'all';
+let currentSearch = '';
+
+function getSortedProducts() {
+  return [...db.products].sort((a,b) => {
+    // In-stock first
+    if (b.qty > 0 && a.qty === 0) return 1;
+    if (a.qty > 0 && b.qty === 0) return -1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function renderProducts(search, brand) {
+  if (search !== undefined) currentSearch = search.toLowerCase();
+  if (brand !== undefined) currentBrandFilter = brand;
+
+  let list = getSortedProducts();
+  if (currentBrandFilter && currentBrandFilter !== 'all')
+    list = list.filter(p => p.brand === currentBrandFilter);
+  if (currentSearch)
+    list = list.filter(p => p.name.toLowerCase().includes(currentSearch) || (p.cat||'').toLowerCase().includes(currentSearch));
+
+  const tbody = document.getElementById('productsTbody');
+  tbody.innerHTML = list.map((p, idx) => {
+    const st = getStockStatus(p);
+    const disc = p.discount || 0;
+    const discCell = disc > 0
+      ? `<span style="background:rgba(239,68,68,0.15);color:var(--red);font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid rgba(239,68,68,0.3);">-${disc}%</span>`
+      : `<input type="number" min="0" max="99" value="0" placeholder="0"
+           onchange="quickDiscount(${p.id},this.value)"
+           style="width:52px;background:var(--bg);border:1px solid var(--border2);color:var(--text2);
+                  padding:4px 6px;font-size:11px;font-family:var(--mono);border-radius:4px;outline:none;text-align:center;"
+           title="Введите % скидки и нажмите Enter">`;
+    return `
+    <tr style="${p.qty > 0 ? 'background:rgba(160,189,65,0.03);' : ''}">
+      <td style="font-family:var(--mono);color:var(--text3);font-size:11px;">${idx+1}</td>
+      <td>
+        <div style="font-weight:600;color:var(--text);font-size:13px;">${p.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">${p.cat||''} · ${p.unit||''}</div>
+      </td>
+      <td><span style="font-family:var(--mono);font-size:11px;color:${p.brand==='ASLAN'?'var(--teal)':p.brand==='TECHNO'?'#60a5fa':p.brand==='GENERAL'?'#a78bfa':'var(--red)'};">${p.brand||'-'}</span></td>
+      <td>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="quickQty(${p.id},-1)">−</button>
+          <span class="qty-val">${p.qty}</span>
+          <button class="qty-btn" onclick="quickQty(${p.id},1)">+</button>
+        </div>
+      </td>
+      <td><span class="stock-badge ${st.cls}">${st.label}</span></td>
+      <td>
+        <div style="font-family:var(--mono);font-size:12px;">${p.price ? p.price.toLocaleString('ru') : '—'}</div>
+        ${p.oldPrice && p.oldPrice !== p.price ? `<div style="font-size:10px;color:var(--text3);text-decoration:line-through;font-family:var(--mono);">${p.oldPrice.toLocaleString('ru')}</div>` : ''}
+      </td>
+      <td>${discCell}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="action-btn" onclick="openEditProduct(${p.id})"><i class="fas fa-edit"></i></button>
+          <button class="action-btn del" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterProducts(val) { renderProducts(val); }
+function filterBrand(brand, el) {
+  document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderProducts(undefined, brand);
+}
+
+function getStockStatus(p) {
+  if (p.qty === 0) return { cls:'stock-out', label:'НЕТ' };
+  if (p.qty < p.minQty) return { cls:'stock-low', label:'МАЛО' };
+  return { cls:'stock-in', label:'ЕСТЬ' };
+}
+
+function quickQty(id, delta) {
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  p.qty = Math.max(0, p.qty + delta);
+  addHistory(delta > 0 ? 'in' : 'out', `${p.name}: ${delta>0?'+':''}${delta} ${p.unit||''}`, p.brand);
+  saveDB();
+  renderProducts();
+  renderDashboard();
+}
+
+// ============================================================
+// PRODUCT MODAL
+// ============================================================
+function openProductModal(id) {
+  document.getElementById('productModalTitle').textContent = 'ДОБАВИТЬ ТОВАР';
+  document.getElementById('pm_id').value = '';
+  ['name','desc','cat','unit','brand'].forEach(f => document.getElementById('pm_'+f).value = f==='unit'?'мешок':f==='brand'?'ASLAN':'');
+  ['qty','minQty','price','oldPrice','discount'].forEach(f => document.getElementById('pm_'+f).value = f==='minQty'?20:0);
+  document.getElementById('pm_discount_preview').textContent = '';
+  document.getElementById('productModal').classList.add('open');
+}
+
+function openEditProduct(id) {
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('productModalTitle').textContent = 'РЕДАКТИРОВАТЬ ТОВАР';
+  document.getElementById('pm_id').value = id;
+  document.getElementById('pm_name').value = p.name || '';
+  document.getElementById('pm_desc').value = p.desc || '';
+  document.getElementById('pm_cat').value = p.cat || '';
+  document.getElementById('pm_unit').value = p.unit || '';
+  document.getElementById('pm_brand').value = p.brand || 'ASLAN';
+  document.getElementById('pm_qty').value = p.qty || 0;
+  document.getElementById('pm_minQty').value = p.minQty || 20;
+  document.getElementById('pm_price').value = p.price || 0;
+  document.getElementById('pm_oldPrice').value = p.oldPrice || 0;
+  document.getElementById('pm_discount').value = p.discount || 0;
+  pmPreviewDiscount();
+  document.getElementById('productModal').classList.add('open');
+}
+
+function saveProduct() {
+  const id = document.getElementById('pm_id').value;
+  const basePrice = parseInt(document.getElementById('pm_price').value) || 0;
+  const discountPct = Math.min(99, Math.max(0, parseInt(document.getElementById('pm_discount').value) || 0));
+  const oldPriceInput = parseInt(document.getElementById('pm_oldPrice').value) || 0;
+  let finalPrice = basePrice;
+  let finalOldPrice = oldPriceInput;
+  if (discountPct > 0 && basePrice > 0) {
+    finalPrice = Math.round(basePrice * (1 - discountPct / 100));
+    if (!finalOldPrice) finalOldPrice = basePrice;
+  }
+  const data = {
+    name: document.getElementById('pm_name').value.trim(),
+    desc: document.getElementById('pm_desc').value.trim(),
+    cat: document.getElementById('pm_cat').value.trim(),
+    unit: document.getElementById('pm_unit').value.trim(),
+    brand: document.getElementById('pm_brand').value,
+    qty: parseInt(document.getElementById('pm_qty').value) || 0,
+    minQty: parseInt(document.getElementById('pm_minQty').value) || 20,
+    price: finalPrice,
+    oldPrice: finalOldPrice,
+    discount: discountPct,
+  };
+  if (!data.name) { showToast('Введите название', 'err'); return; }
+  if (id) {
+    const idx = db.products.findIndex(x => x.id === parseInt(id));
+    if (idx >= 0) db.products[idx] = { ...db.products[idx], ...data };
+    addHistory('edit', `Изменён: ${data.name}${discountPct>0?' · скидка -'+discountPct+'%':''}`, data.brand);
+  } else {
+    db.products.push({ id: db.nextId++, ...data });
+    addHistory('in', `Добавлен: ${data.name}`, data.brand);
+  }
+  saveDB();
+  closeModal('productModal');
+  renderProducts();
+  renderDashboard();
+  loadArrivalSelect();
+  showToast('Товар сохранён ✓', 'ok');
+}
+
+function pmPreviewDiscount() {
+  const price = parseInt(document.getElementById('pm_price').value) || 0;
+  const disc = Math.min(99, Math.max(0, parseInt(document.getElementById('pm_discount').value) || 0));
+  const prev = document.getElementById('pm_discount_preview');
+  if (disc > 0 && price > 0) {
+    const fp = Math.round(price * (1 - disc / 100));
+    prev.textContent = '→ ' + fp.toLocaleString('ru') + ' сум (было: ' + price.toLocaleString('ru') + ')';
+    prev.style.color = 'var(--green)';
+  } else { prev.textContent = ''; }
+}
+
+function quickDiscount(id, val) {
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  const disc = Math.min(99, Math.max(0, parseInt(val) || 0));
+  if (disc > 0) {
+    const originalPrice = p.oldPrice || p.price;
+    p.oldPrice = originalPrice;
+    p.price = Math.round(originalPrice * (1 - disc / 100));
+    p.discount = disc;
+    addHistory('edit', `${p.name} скидка -${disc}%: ${p.price.toLocaleString('ru')} сум`, p.brand);
+  } else {
+    if (p.oldPrice) p.price = p.oldPrice;
+    p.oldPrice = 0;
+    p.discount = 0;
+    addHistory('edit', `${p.name} скидка убрана`, p.brand);
+  }
+  saveDB();
+  renderProducts();
+  showToast(disc > 0 ? `✅ Скидка -${disc}% применена` : 'Скидка убрана', disc > 0 ? 'ok' : 'err');
+}
+
+function deleteProduct(id) {
+  const p = db.products.find(x => x.id === id);
+  if (!p || !confirm(`Удалить "${p.name}"?`)) return;
+  db.products = db.products.filter(x => x.id !== id);
+  addHistory('edit', `Удалён: ${p.name}`, p.brand);
+  saveDB();
+  renderProducts();
+  renderDashboard();
+  showToast('Товар удалён', 'err');
+}
+
+// ============================================================
+// SITE CARDS — IN-STOCK FIRST
+// ============================================================
+function getSortedSiteCards() {
+  return [...db.siteCards].sort((a,b) => {
+    if (b.inStock && !a.inStock) return 1;
+    if (a.inStock && !b.inStock) return -1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+}
+
+function renderSiteCards() {
+  const cards = getSortedSiteCards();
+  const grid = document.getElementById('siteCardsGrid');
+  if (!cards.length) {
+    grid.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:13px;padding:40px 0;">
+      Нет карточек. Нажмите «Добавить карточку» чтобы создать первую.
+    </div>`;
+    return;
+  }
+  grid.innerHTML = cards.map((c, idx) => `
+    <div class="site-card ${c.inStock ? 'in-stock' : 'out-stock'}">
+      ${idx === 0 && c.inStock ? '<div class="card-priority-badge" style="position:absolute;top:10px;left:10px;z-index:2;"><i class="fas fa-star"></i> ПЕРВЫЙ НА САЙТЕ</div>' : ''}
+      ${c.image
+        ? `<img src="${c.image}" class="site-card-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="site-card-img-placeholder" style="display:none;">🏗️</div>`
+        : `<div class="site-card-img-placeholder">🏗️</div>`}
+      <div class="site-card-body">
+        <div class="site-card-name">${c.name}</div>
+        ${c.category ? `<div style="font-size:10px;color:var(--teal);font-family:var(--mono);margin-bottom:4px;">${c.category}</div>` : ''}
+        <div class="site-card-desc">${c.desc || ''}</div>
+        <div>
+          <span class="site-card-price">${c.price ? c.price.toLocaleString('ru') + ' сум' : '—'}</span>
+          ${c.oldPrice ? `<span class="site-card-old">${c.oldPrice.toLocaleString('ru')}</span>` : ''}
+        </div>
+      </div>
+      <div class="site-card-footer">
+        <button class="card-stock-toggle ${c.inStock?'in':'out'}" onclick="toggleCardStock('${c.id}')">
+          ${c.inStock ? '✅ В наличии' : '❌ Нет'}
+        </button>
+        <button class="action-btn" onclick="openEditCard('${c.id}')" style="margin-left:auto;"><i class="fas fa-edit"></i></button>
+        <button class="action-btn del" onclick="deleteCard('${c.id}')"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCardModal() {
+  document.getElementById('cardModalTitle').textContent = 'ДОБАВИТЬ КАРТОЧКУ';
+  document.getElementById('cm_id').value = '';
+  ['name','desc','image','category'].forEach(f => document.getElementById('cm_'+f).value = '');
+  ['price','oldPrice'].forEach(f => document.getElementById('cm_'+f).value = '');
+  document.getElementById('cm_inStock').value = '1';
+  document.getElementById('cm_preview').style.display = 'none';
+  document.getElementById('cardModal').classList.add('open');
+}
+
+function openEditCard(id) {
+  const c = db.siteCards.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('cardModalTitle').textContent = 'РЕДАКТИРОВАТЬ КАРТОЧКУ';
+  document.getElementById('cm_id').value = id;
+  document.getElementById('cm_name').value = c.name || '';
+  document.getElementById('cm_desc').value = c.desc || '';
+  document.getElementById('cm_price').value = c.price || '';
+  document.getElementById('cm_oldPrice').value = c.oldPrice || '';
+  document.getElementById('cm_image').value = c.image || '';
+  document.getElementById('cm_inStock').value = c.inStock ? '1' : '0';
+  document.getElementById('cm_category').value = c.category || '';
+  const prev = document.getElementById('cm_preview');
+  if (c.image) { prev.src = c.image; prev.style.display = 'block'; }
+  else prev.style.display = 'none';
+  document.getElementById('cardModal').classList.add('open');
+}
+
+function previewCardImg(url) {
+  const prev = document.getElementById('cm_preview');
+  if (url) { prev.src = url; prev.style.display = 'block'; }
+  else prev.style.display = 'none';
+}
+
+function saveCard() {
+  const id = document.getElementById('cm_id').value;
+  const data = {
+    name: document.getElementById('cm_name').value.trim(),
+    desc: document.getElementById('cm_desc').value.trim(),
+    price: parseInt(document.getElementById('cm_price').value) || 0,
+    oldPrice: parseInt(document.getElementById('cm_oldPrice').value) || 0,
+    image: document.getElementById('cm_image').value.trim(),
+    inStock: document.getElementById('cm_inStock').value === '1',
+    category: document.getElementById('cm_category').value.trim(),
+  };
+  if (!data.name) { showToast('Введите название', 'err'); return; }
+  if (id) {
+    const idx = db.siteCards.findIndex(x => x.id === id);
+    if (idx >= 0) db.siteCards[idx] = { ...db.siteCards[idx], ...data };
+  } else {
+    db.siteCards.push({ id: 'sc_' + Date.now(), createdAt: new Date().toISOString(), ...data });
+  }
+  saveDB();
+  closeModal('cardModal');
+  renderSiteCards();
+  showToast('Карточка сохранена ✓', 'ok');
+}
+
+function toggleCardStock(id) {
+  const c = db.siteCards.find(x => x.id === id);
+  if (!c) return;
+  c.inStock = !c.inStock;
+  saveDB();
+  renderSiteCards();
+  showToast(c.inStock ? '✅ В наличии' : '❌ Снято с наличия', c.inStock ? 'ok' : 'err');
+}
+
+function deleteCard(id) {
+  const c = db.siteCards.find(x => x.id === id);
+  if (!c || !confirm(`Удалить карточку "${c.name}"?`)) return;
+  db.siteCards = db.siteCards.filter(x => x.id !== id);
+  saveDB();
+  renderSiteCards();
+  showToast('Карточка удалена', 'err');
+}
+
+// ============================================================
+// BANNERS
+// ============================================================
+function renderBanners() {
+  if (!db.banners) db.banners = initDefaultBanners();
+  const grid = document.getElementById('bannersGrid');
+  grid.innerHTML = db.banners.map(b => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${!b.active?'opacity:.5':''}">
+      <div style="padding:16px 20px;background:${b.bg||'#333'};display:flex;align-items:center;gap:12px;">
+        <span style="font-size:28px;">${b.icon||'📢'}</span>
+        <div>
+          <div style="color:white;font-weight:800;font-size:15px;">${b.title}</div>
+          <div style="color:rgba(255,255,255,0.7);font-size:12px;">${b.sub||''}</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <span style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;${b.active?'background:rgba(160,189,65,0.2);color:var(--green);border:1px solid rgba(160,189,65,0.4)':'background:rgba(239,68,68,0.2);color:var(--red);border:1px solid rgba(239,68,68,0.4)'}">
+            ${b.active ? 'АКТИВЕН' : 'СКРЫТ'}
+          </span>
+        </div>
+      </div>
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:13px;color:var(--text2);flex:1;">${b.text||''}</span>
+        <button class="action-btn" onclick="openEditBanner(${b.id})"><i class="fas fa-edit"></i></button>
+        <button class="action-btn" onclick="toggleBanner(${b.id})">${b.active?'<i class="fas fa-eye-slash"></i>':'<i class="fas fa-eye"></i>'}</button>
+        <button class="action-btn del" onclick="deleteBanner(${b.id})"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openBannerModal() {
+  document.getElementById('bannerModalTitle').textContent = 'ДОБАВИТЬ БАННЕР';
+  document.getElementById('bm_id').value = '';
+  ['title','sub','text','bg','icon','btn1','link1'].forEach(f => document.getElementById('bm_'+f).value = '');
+  document.getElementById('bm_active').value = '1';
+  document.getElementById('bannerModal').classList.add('open');
+}
+
+function openEditBanner(id) {
+  const b = db.banners.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('bannerModalTitle').textContent = 'РЕДАКТИРОВАТЬ БАННЕР';
+  document.getElementById('bm_id').value = id;
+  document.getElementById('bm_title').value = b.title || '';
+  document.getElementById('bm_sub').value = b.sub || '';
+  document.getElementById('bm_text').value = b.text || '';
+  document.getElementById('bm_bg').value = b.bg || '';
+  document.getElementById('bm_icon').value = b.icon || '';
+  document.getElementById('bm_btn1').value = b.btn1 || '';
+  document.getElementById('bm_link1').value = b.link1 || '';
+  document.getElementById('bm_active').value = b.active ? '1' : '0';
+  document.getElementById('bannerModal').classList.add('open');
+}
+
+function saveBanner() {
+  const id = parseInt(document.getElementById('bm_id').value);
+  const data = {
+    title: document.getElementById('bm_title').value.trim(),
+    sub: document.getElementById('bm_sub').value.trim(),
+    text: document.getElementById('bm_text').value.trim(),
+    bg: document.getElementById('bm_bg').value.trim() || 'linear-gradient(135deg,#1e3a5f,#2563eb)',
+    icon: document.getElementById('bm_icon').value.trim() || '📢',
+    btn1: document.getElementById('bm_btn1').value.trim(),
+    link1: document.getElementById('bm_link1').value.trim(),
+    active: document.getElementById('bm_active').value === '1',
+  };
+  if (!data.title) { showToast('Введите заголовок', 'err'); return; }
+  if (id) {
+    const idx = db.banners.findIndex(x => x.id === id);
+    if (idx >= 0) db.banners[idx] = { ...db.banners[idx], ...data };
+  } else {
+    const newId = (db.banners.reduce((m,b) => Math.max(m,b.id),0)) + 1;
+    db.banners.push({ id: newId, ...data });
+  }
+  saveDB();
+  closeModal('bannerModal');
+  renderBanners();
+  showToast('Баннер сохранён ✓', 'ok');
+}
+
+function toggleBanner(id) {
+  const b = db.banners.find(x => x.id === id);
+  if (!b) return;
+  b.active = !b.active;
+  saveDB();
+  renderBanners();
+}
+
+function deleteBanner(id) {
+  if (!confirm('Удалить баннер?')) return;
+  db.banners = db.banners.filter(x => x.id !== id);
+  saveDB();
+  renderBanners();
+  showToast('Баннер удалён', 'err');
+}
+
+// ============================================================
+// SITE INFO
+// ============================================================
+function loadSiteInfoForm() {
+  const si = db.siteInfo || {};
+  document.getElementById('si_title').value = si.title || 'EcoStroy — Ваш магазин';
+  document.getElementById('si_sub').value = si.sub || 'Строительные материалы в Ангрене';
+  document.getElementById('si_welcome').value = si.welcome || '';
+  document.getElementById('si_phone').value = si.phone || '';
+  document.getElementById('si_telegram').value = si.telegram || '';
+  document.getElementById('si_address').value = si.address || '';
+}
+
+function saveSiteInfo() {
+  db.siteInfo = {
+    title: document.getElementById('si_title').value,
+    sub: document.getElementById('si_sub').value,
+    welcome: document.getElementById('si_welcome').value,
+    phone: document.getElementById('si_phone').value,
+    telegram: document.getElementById('si_telegram').value,
+    address: document.getElementById('si_address').value,
+  };
+  saveDB();
+  showToast('Настройки сайта сохранены ✓', 'ok');
+}
+
+// ============================================================
+// ARRIVALS
+// ============================================================
+function loadArrivalSelect() {
+  const sel = document.getElementById('arrProduct');
+  if (!sel) return;
+  const sorted = getSortedProducts();
+  sel.innerHTML = sorted.map(p => `<option value="${p.id}">${p.brand ? '['+p.brand+'] ' : ''}${p.name} — ${p.qty} ${p.unit||''}</option>`).join('');
+}
+
+function processArrival() {
+  const pid = parseInt(document.getElementById('arrProduct').value);
+  const qty = parseInt(document.getElementById('arrQty').value) || 0;
+  const price = parseInt(document.getElementById('arrPrice').value) || 0;
+  const supplier = document.getElementById('arrSupplier').value.trim();
+  const note = document.getElementById('arrNote').value.trim();
+  if (!pid || qty <= 0) { showToast('Выберите товар и количество', 'err'); return; }
+  const p = db.products.find(x => x.id === pid);
+  if (!p) return;
+  p.qty += qty;
+  if (price) p.price = price;
+  const msg = `${p.name} +${qty} ${p.unit||''}${supplier?' · '+supplier:''}${note?' · '+note:''}`;
+  addHistory('in', msg, p.brand);
+  saveDB();
+  loadArrivalSelect();
+  renderDashboard();
+  document.getElementById('arrQty').value = 1;
+  document.getElementById('arrPrice').value = '';
+  document.getElementById('arrSupplier').value = '';
+  document.getElementById('arrNote').value = '';
+  showToast(`Принято: +${qty} ${p.unit||''} · ${p.name}`, 'ok');
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function addHistory(type, msg, brand) {
+  if (!db.history) db.history = [];
+  db.history.unshift({ type, msg, brand: brand||'', ts: new Date().toISOString() });
+  if (db.history.length > 500) db.history = db.history.slice(0, 500);
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!db.history || !db.history.length) {
+    list.innerHTML = '<div style="color:var(--text3);font-family:var(--mono);font-size:13px;padding:20px 0;">История пуста</div>';
+    return;
+  }
+  list.innerHTML = db.history.slice(0, 100).map(h => {
+    const icons = { in:'<i class="fas fa-arrow-down"></i>', out:'<i class="fas fa-arrow-up"></i>', edit:'<i class="fas fa-pen"></i>' };
+    const d = new Date(h.ts);
+    return `
+    <div class="hist-item">
+      <div class="hist-icon ${h.type}">${icons[h.type]||'<i class="fas fa-circle"></i>'}</div>
+      <div class="hist-meta">
+        <div class="hist-title">${h.msg}</div>
+        <div class="hist-sub">${h.brand||''}</div>
+      </div>
+      <div class="hist-time">${d.toLocaleDateString('ru-RU')}<br>${d.toLocaleTimeString('ru-RU')}</div>
+    </div>`;
+  }).join('');
+}
+
+function exportHistory() {
+  if (!db.history || !db.history.length) { showToast('История пуста', 'err'); return; }
+  const rows = [['Тип','Описание','Бренд','Дата','Время']];
+  db.history.forEach(h => {
+    const d = new Date(h.ts);
+    rows.push([h.type, h.msg, h.brand, d.toLocaleDateString('ru-RU'), d.toLocaleTimeString('ru-RU')]);
+  });
+  const csv = rows.map(r => r.map(c => `"${(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csv);
+  a.download = 'ecostroy_history_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('Экспорт готов ✓', 'ok');
+}
+
+function clearHistory() {
+  if (!confirm('Очистить всю историю?')) return;
+  db.history = [];
+  saveDB();
+  renderHistory();
+  showToast('История очищена', 'err');
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function changePassword() {
+  const cur = document.getElementById('pwdCurrent').value;
+  const nw = document.getElementById('pwdNew').value;
+  if (cur !== getPass()) { showToast('Неверный текущий пароль', 'err'); return; }
+  if (nw.length < 6) { showToast('Пароль минимум 6 символов', 'err'); return; }
+  localStorage.setItem(PASS_KEY, nw);
+  document.getElementById('pwdCurrent').value = '';
+  document.getElementById('pwdNew').value = '';
+  showToast('Пароль изменён ✓', 'ok');
+}
+
+function exportAllData() {
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(db, null, 2));
+  a.download = 'ecostroy_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showToast('Резервная копия создана ✓', 'ok');
+}
+
+function resetWarehouse() {
+  if (!confirm('Сбросить склад к заводским настройкам? Все данные будут удалены!')) return;
+  db = { products:[], history:[], siteCards:[], banners:[], siteInfo:{}, siteConfig:{}, productOverrides:{}, nextId:1 };
+  initDefaultData();
+  db.banners = initDefaultBanners();
+  db.siteInfo = initDefaultSiteInfo();
+  saveDB();
+  renderAll();
+  loadArrivalSelect();
+  loadSiteInfoForm();
+  showToast('Склад сброшен к настройкам по умолчанию', 'ok');
+}
+
+// ============================================================
+// MODAL / TOAST
+// ============================================================
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + (type||'ok');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Close modals on bg click
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+});
+
+// ============================================================
+// REVIEWS ADMIN MANAGEMENT
+// ============================================================
+// Use same key as index.html uses for reviews
+const REVIEWS_KEY = "ecostroy_reviews";
+const REVIEWS_KEY_V1 = "ecostroy_reviews_v1";
+let reviewFilter = "all";
+
+function getReviews() {
+  try {
+    // Try legacy key first (used by index.html for writing new reviews)
+    const legacy = JSON.parse(localStorage.getItem(REVIEWS_KEY)) || [];
+    // Also check v1 key format (index.html uses both)
+    let v1raw = localStorage.getItem(REVIEWS_KEY_V1);
+    let v1arr = [];
+    if (v1raw) {
+      const v1obj = JSON.parse(v1raw);
+      // v1 format is an object {productKey: [reviews...]}
+      if (typeof v1obj === 'object' && !Array.isArray(v1obj)) {
+        Object.values(v1obj).forEach(arr => { if (Array.isArray(arr)) v1arr = v1arr.concat(arr); });
+      }
+    }
+    // Merge, deduplicate by id
+    const all = [...legacy];
+    v1arr.forEach(r => { if (!all.find(x => x.id === r.id)) all.push(r); });
+    return all.sort((a,b) => new Date(b.date||b.ts||0) - new Date(a.date||a.ts||0));
+  }
+  catch(e) { return []; }
+}
+
+function saveReviewsLS(reviews) { localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); }
+
+function filterReviews(f, el) {
+  reviewFilter = f;
+  document.querySelectorAll("[data-rfilt]").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+  renderReviewsAdmin();
+}
+
+function renderReviewsAdmin() {
+  const container = document.getElementById("reviewsAdminList");
+  if (!container) return;
+  let allReviews = getReviews();
+  const totalPending = allReviews.filter(r => !r.approved).length;
+  const navEl = document.querySelector("[data-page=review]");
+  let reviews = allReviews;
+  if (reviewFilter === "pending") reviews = allReviews.filter(r => !r.approved);
+  if (reviewFilter === "approved") reviews = allReviews.filter(r => r.approved);
+  if (!reviews.length) { container.innerHTML = "<div style='color:var(--text3);font-family:var(--mono);font-size:13px;padding:24px 0;'>Отзывов нет</div>"; return; }
+  container.innerHTML = reviews.map(r => {
+    const d = new Date(r.date);
+    const stars = "*".repeat(r.stars||0);
+    return "<div class=tbl-wrap style=padding:18px;margin-bottom:14px;border-left:3px solid " + (r.approved?"var(--green)":"var(--yellow)") + ">" +
+      "<div style=display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px>" +
+      "<div><div style=font-weight:700;font-size:15px;color:var(--text)>" + r.author + "</div><div>" + "<i class=fas fa-star style=color:var(--yellow)></i>".repeat(r.stars||0) + "</div></div>" +
+      "<div><div style=font-size:11px;color:var(--text3);font-family:var(--mono)>" + d.toLocaleDateString("ru-RU") + "</div>" +
+      "<span style='display:inline-block;margin-top:4px;font-size:10px;font-family:var(--mono);padding:3px 10px;border-radius:20px;" + (r.approved?"background:rgba(160,189,65,.15);color:var(--green);border:1px solid rgba(160,189,65,.3)":"background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)") + "'> " + (r.approved?"ОПУБЛИКОВАН":"НА МОДЕРАЦИИ") + "</span></div></div>" +
+      "<div style=font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:6px>" + r.text + "</div>" +
+      "<div style=display:flex;gap:8px;flex-wrap:wrap>" +
+      (!r.approved ? "<button class=btn-save style=padding:7px_18px;font-size:12px onclick=approveReview(" + r.id + ")><i class=fas fa-check></i> Опубликовать</button>" :
+        "<button class=btn-cancel style=padding:7px_18px;font-size:12px onclick=unapproveReview(" + r.id + ")><i class=fas fa-eye-slash></i> Скрыть</button>") +
+      "<button class=btn-cancel style='padding:7px 18px;font-size:12px;border-color:var(--red);color:var(--red)' onclick=deleteReview(" + r.id + ")><i class=fas fa-trash></i> Удалить</button>" +
+      "</div></div>";
+  }).join("");
+}
+
+function approveReview(id) {
+  const reviews = getReviews();
+  const r = reviews.find(x => x.id === id);
+  if (r) { r.approved = true; saveReviewsLS(reviews); renderReviewsAdmin(); showToast("Отзыв опубликован на сайте", "ok"); }
+}
+function unapproveReview(id) {
+  const reviews = getReviews();
+  const r = reviews.find(x => x.id === id);
+  if (r) { r.approved = false; saveReviewsLS(reviews); renderReviewsAdmin(); showToast("Отзыв скрыт с сайта", "ok"); }
+}
+function deleteReview(id) {
+  if (!confirm("Удалить этот отзыв?")) return;
+  saveReviewsLS(getReviews().filter(x => x.id !== id));
+  renderReviewsAdmin();
+  showToast("Отзыв удалён", "err");
+}
+function clearAllReviews() {
+  if (!confirm("Удалить ВСЕ отзывы?")) return;
+  saveReviewsLS([]);
+  renderReviewsAdmin();
+  showToast("Все отзывы удалены", "err");
+}
+
+function updateReviewBadge() {
+  const pending = getReviews().filter(r => !r.approved).length;
+  document.querySelectorAll(".rev-badge").forEach(b=>b.remove());
+  if (pending > 0) {
+    const navEl = document.querySelector("[data-page=reviews]");
+    if (navEl) {
+      const badge = document.createElement("span");
+      badge.className = "rev-badge";
+      badge.style.cssText = "background:var(--red);color:white;font-size:9px;padding:2px 6px;border-radius:10px;font-family:var(--mono);font-weight:700;margin-left:auto;";
+      badge.textContent = pending;
+      navEl.appendChild(badge);
+    }
+  }
+  const rb = document.getElementById('dashReviewBadge');
+  if (rb) rb.textContent = pending > 0 ? pending : '';
+}
+updateReviewBadge();
+setInterval(updateReviewBadge, 30000);
+
+// ============================================================
+// ORDERS FROM SITE
+// ============================================================
+let orderFilter = 'all';
+
+function filterOrders(f, el) {
+  orderFilter = f;
+  document.querySelectorAll('[data-ofilt]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderOrders();
+}
+
+function renderOrders() {
+  const container = document.getElementById('ordersList');
+  if (!container) return;
+  let orders = getSiteOrders().slice().reverse();
+  if (orderFilter === 'pending') orders = orders.filter(o => !o.done && !o.completed);
+  if (orderFilter === 'done') orders = orders.filter(o => o.done || o.completed);
+
+  if (!orders.length) {
+    container.innerHTML = `<div style="color:var(--text3);font-family:var(--mono);font-size:13px;padding:24px 0;">Заказов нет</div>`;
+    return;
+  }
+
+  container.innerHTML = orders.map((o, idx) => {
+    const d = new Date(o.date || o.ts || o.createdAt || Date.now());
+    const totalSum = (o.items||[]).reduce((s,i) => s + (i.price||0)*(i.quantity||1), 0);
+    const name = o.customerName || o.name || 'Покупатель';
+    const phone = o.customerPhone || o.phone || '—';
+    const isDone = o.done || o.completed;
+    const oid = o.id || ('ord_'+idx);
+    return `<div class="tbl-wrap" style="padding:18px;margin-bottom:12px;border-left:3px solid ${isDone?'var(--green)':'var(--yellow)'};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;color:var(--text);">${name}</div>
+          <div style="font-size:12px;color:var(--text2);font-family:var(--mono);">📞 ${phone}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">${d.toLocaleDateString('ru-RU')} ${d.toLocaleTimeString('ru-RU')}</div>
+          <span style="display:inline-block;margin-top:4px;font-size:10px;font-family:var(--mono);padding:3px 10px;border-radius:20px;${isDone?'background:rgba(160,189,65,.15);color:var(--green);border:1px solid rgba(160,189,65,.3)':'background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)'}">${isDone?'ВЫПОЛНЕН':'ОЖИДАЕТ'}</span>
+        </div>
+      </div>
+      <div style="background:var(--bg);border-radius:6px;padding:12px;margin-bottom:12px;">
+        ${(o.items||[]).map(item => `
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+            <span style="color:var(--text);">${item.name||'?'} × ${item.quantity||1}</span>
+            <span style="font-family:var(--mono);color:var(--green);">${((item.price||0)*(item.quantity||1)).toLocaleString('ru')} сум</span>
+          </div>
+        `).join('')}
+        <div style="display:flex;justify-content:flex-end;margin-top:8px;font-weight:700;font-family:var(--mono);color:var(--text);">ИТОГО: ${totalSum.toLocaleString('ru')} сум</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        ${!isDone ? `<button class="btn-save" style="padding:7px 18px;font-size:12px;" onclick="markOrderDone('${oid}')"><i class="fas fa-check"></i> Выполнен</button>` : ''}
+        <button class="btn-cancel" style="padding:7px 18px;font-size:12px;" onclick="deleteOrder('${oid}')"><i class="fas fa-trash"></i> Удалить</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function markOrderDone(id) {
+  const orders = getSiteOrders();
+  const target = orders.find(o => String(o.id) === String(id));
+  if (target) { target.done = true; localStorage.setItem('ecostroy_order_history', JSON.stringify(orders)); renderOrders(); renderDashboard(); showToast('Заказ выполнен ✓', 'ok'); }
+}
+
+function deleteOrder(id) {
+  if (!confirm('Удалить этот заказ?')) return;
+  const orders = getSiteOrders().filter(o => String(o.id) !== String(id));
+  localStorage.setItem('ecostroy_order_history', JSON.stringify(orders));
+  renderOrders(); renderDashboard(); showToast('Заказ удалён', 'err');
+}
+
+function exportOrders() {
+  const orders = getSiteOrders();
+  if (!orders.length) { showToast('Нет заказов', 'err'); return; }
+  const rows = [['Имя','Телефон','Товары','Сумма','Дата','Статус']];
+  orders.forEach(o => {
+    const d = new Date(o.date||o.ts||Date.now());
+    const total = (o.items||[]).reduce((s,i)=>s+(i.price||0)*(i.quantity||1),0);
+    rows.push([o.customerName||o.name||'—', o.customerPhone||o.phone||'—', (o.items||[]).map(i=>`${i.name||'?'} x${i.quantity||1}`).join('; '), total, d.toLocaleDateString('ru-RU'), o.done?'Выполнен':'Ожидает']);
+  });
+  const csv = rows.map(r=>r.map(c=>`"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+csv);
+  a.download = 'ecostroy_orders_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  showToast('Экспорт заказов готов ✓', 'ok');
+}
+
+// ============================================================
+// LIVE PREVIEW
+// ============================================================
+function renderLivePreview() {
+  const container = document.getElementById('livePreviewContent');
+  if (!container) return;
+  const si = db.siteInfo || {};
+  const cards = db.siteCards.filter(c => c.inStock).slice(0, 6);
+  const banners = (db.banners || []).filter(b => b.active).slice(0, 2);
+  const orders = getSiteOrders();
+  const pendingReviews = getReviews().filter(r => !r.approved).length;
+  const approvedReviews = getReviews().filter(r => r.approved);
+
+  container.style.cssText = "font-family:'Plus Jakarta Sans',sans-serif;background:#f8fafd;min-height:600px;padding:20px;";
+  container.innerHTML = `
+    <div style="background:linear-gradient(145deg,#a0bd41,#37a488);color:white;padding:24px 20px;border-radius:16px;margin-bottom:16px;">
+      <div style="font-size:22px;font-weight:800;">${si.title||'EcoStroy'}</div>
+      <div style="font-size:13px;opacity:.85;">${si.sub||'Строительные материалы'}</div>
+      ${si.welcome ? `<div style="margin-top:8px;font-size:12px;opacity:.8;">${si.welcome.slice(0,100)}...</div>` : ''}
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span style="background:rgba(255,255,255,.2);padding:6px 14px;border-radius:20px;font-size:13px;">📞 ${si.phone||'+998...'}</span>
+        <span style="background:rgba(255,255,255,.2);padding:6px 14px;border-radius:20px;font-size:13px;">📍 ${si.address||'Ангрен'}</span>
+      </div>
+    </div>
+    ${banners.length ? `<div style="margin-bottom:16px;"><div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Активные баннеры (${banners.length})</div>${banners.map(b=>`<div style="background:${b.bg||'#333'};border-radius:12px;padding:14px;margin-bottom:8px;color:white;"><span style="font-size:20px;">${b.icon||''}</span> <strong>${b.title}</strong> — <span style="opacity:.8;">${b.text||''}</span></div>`).join('')}</div>` : '<div style="background:#fef3c7;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#92400e;">⚠ Нет активных баннеров. Добавьте в разделе «Баннеры/Акции»</div>'}
+    <div style="margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:10px;">🏗️ Товары в наличии на сайте (${cards.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+        ${cards.length ? cards.map(c=>`
+          <div style="background:white;border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);border:1.5px solid rgba(160,189,65,.3);">
+            ${c.image?`<img src="${c.image}" style="width:100%;height:90px;object-fit:cover;" onerror="this.style.display='none'">` : '<div style="height:90px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);display:flex;align-items:center;justify-content:center;font-size:28px;">🏗️</div>'}
+            <div style="padding:10px;"><div style="font-weight:700;font-size:12px;color:#1e293b;">${c.name}</div><div style="font-weight:800;color:#a0bd41;font-size:13px;margin-top:4px;">${c.price?c.price.toLocaleString('ru')+' сум':'—'}</div></div>
+          </div>`).join('') : '<div style="color:#94a3b8;font-size:13px;padding:20px;grid-column:1/-1;text-align:center;">Нет активных карточек.<br>Добавьте в «Карточки сайта» и отметьте В наличии</div>'}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Заказов</div>
+        <div style="font-size:28px;font-weight:800;color:#a0bd41;">${orders.length}</div>
+        <div style="font-size:10px;color:#64748b;">${orders.filter(o=>!o.done&&!o.completed).length} ожидают</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Отзывы</div>
+        <div style="font-size:28px;font-weight:800;color:#f59e0b;">${pendingReviews}</div>
+        <div style="font-size:10px;color:#64748b;">на модерации</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Опубликовано</div>
+        <div style="font-size:28px;font-weight:800;color:#37a488;">${approvedReviews.length}</div>
+        <div style="font-size:10px;color:#64748b;">отзывов видно</div>
+      </div>
+    </div>
+  `;
+}
+
+function refreshPreview() { renderLivePreview(); showToast('Предпросмотр обновлён ✓', 'ok'); }
+
+// ══════════════════════════════════════════════════════════════════
+//  SITE STOCK MANAGEMENT
+// ══════════════════════════════════════════════════════════════════
+var SITE_CATALOG = [
+  // ═══ ASLAN ═══
+  {id:201,name:'ASLAN SPREY SUVOQ',brand:'aslan',category:'Штукатурка',basePrice:44200,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:202,name:'ASLAN ROTSUVOQ',brand:'aslan',category:'Штукатурка',basePrice:40200,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:203,name:'ASLAN SATEN',brand:'aslan',category:'Шпаклёвка',basePrice:31000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:204,name:'ASLAN PRO SATEN',brand:'aslan',category:'Шпаклёвка',basePrice:31000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:205,name:'ASLAN SUPER FINISH',brand:'aslan',category:'Шпаклёвка',basePrice:31000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:206,name:'ASLAN FUGA GIPS',brand:'aslan',category:'Шпаклёвка',basePrice:46200,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:207,name:'ASLAN BOARD-FIX',brand:'aslan',category:'Клей',basePrice:31000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:208,name:'ASLAN GIPS DECOR',brand:'aslan',category:'Декор',basePrice:27000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:209,name:'ASLAN CERA-FIX',brand:'aslan',category:'Клей',basePrice:32000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:210,name:'ASLAN CERA-FIX PLUS+',brand:'aslan',category:'Клей',basePrice:35000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:211,name:'ASLAN GRANITE-FIX',brand:'aslan',category:'Клей',basePrice:38000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:212,name:'ASLAN BLOK_FIX',brand:'aslan',category:'Клей',basePrice:32500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:213,name:'ASLAN IZO-SUVOQ',brand:'aslan',category:'Штукатурка',basePrice:40000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:214,name:'ASLAN SUVOQ',brand:'aslan',category:'Штукатурка',basePrice:40500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:215,name:'ASLAN FASAD SUVOQ',brand:'aslan',category:'Штукатурка',basePrice:34500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:216,name:'ASLAN COAT EX',brand:'aslan',category:'Штукатурка',basePrice:40500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:217,name:'ASLAN BETONCHI',brand:'aslan',category:'Спецсостав',basePrice:48500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:218,name:'ASLAN POL-TEK',brand:'aslan',category:'Наливной пол',basePrice:254000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:219,name:'ASLAN BETO-KONTAKT',brand:'aslan',category:'Грунтовки',basePrice:105000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:220,name:'ASLAN AKRILIK ASTAR',brand:'aslan',category:'Грунтовки',basePrice:71000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  // ═══ OSCAR — Краски и эмали ═══
+  {id:151,name:'Эмаль Оскар 2.4кг',brand:'oscar',category:'Эмаль',basePrice:52000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:251,name:'Эмаль Оскар 0.7кг',brand:'oscar',category:'Эмаль',basePrice:19000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:252,name:'Эмаль X-tra 2.4кг',brand:'oscar',category:'Эмаль',basePrice:53000,img:'https://i.ibb.co/N6bh91tn/2026-02-23-181649.png'},
+  {id:253,name:'Эмаль X-tra 0.7кг',brand:'oscar',category:'Эмаль',basePrice:19000,img:'https://i.ibb.co/N6bh91tn/2026-02-23-181649.png'},
+  {id:152,name:'Oscar Deluxe водная',brand:'oscar',category:'Краски',basePrice:97000,img:'https://i.ibb.co/V0XGr8sN/2026-02-24-141007.png'},
+  {id:254,name:'Oscar Deluxe голубая',brand:'oscar',category:'Краски',basePrice:90000,img:'https://i.ibb.co/V0XGr8sN/2026-02-24-141007.png'},
+  {id:310,name:'Водная Краска OSCAR DELUXE',brand:'oscar',category:'Краски',basePrice:85200,img:'https://i.ibb.co/7d2032cC/2026-02-23-181750.png'},
+  {id:153,name:'Нитроэмаль НЦ',brand:'oscar',category:'Эмаль',basePrice:48000,img:'https://i.ibb.co/ZzmskTH7/2026-02-19-174506.png'},
+  {id:256,name:'Нитро эмаль 0.85кг',brand:'oscar',category:'Эмаль',basePrice:35000,img:'https://i.ibb.co/G3FDWdW0/2026-02-24-141615.png'},
+  {id:332,name:'Эмаль белая ПФ-115 Deluxe',brand:'oscar',category:'Эмаль',basePrice:38900,img:'https://i.ibb.co/tPcvJCBS/2026-02-24-141329.png'},
+  {id:333,name:'Эмаль половая ПФ-266 Deluxe',brand:'oscar',category:'Эмаль',basePrice:28900,img:'https://i.ibb.co/Wv4NvQN3/2026-02-24-141340.png'},
+  {id:334,name:'Эмаль разных цветов',brand:'oscar',category:'Эмаль',basePrice:349000,img:'https://i.ibb.co/99WhpM5F/2026-02-24-141412.png'},
+  {id:157,name:'Эмульсия Universal 4кг',brand:'oscar',category:'Краски',basePrice:33000,img:'https://i.ibb.co/ccv4HD5J/2026-02-23-182228.png'},
+  {id:255,name:'Эмульсия Оскар вн. 7кг',brand:'oscar',category:'Краски',basePrice:67000,img:'https://i.ibb.co/7JXfjbFP/2026-02-23-182242.png'},
+  {id:308,name:'Эмульсия Асос',brand:'oscar',category:'Краски',basePrice:82500,img:'https://i.ibb.co/DDvhzKC8/2026-02-24-142031.png'},
+  // ═══ OSCAR — Лаки ═══
+  {id:161,name:'Лак Универсал 0.7л',brand:'oscar',category:'Лаки',basePrice:20400,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:261,name:'Лак Универсал 0.5л',brand:'oscar',category:'Лаки',basePrice:15000,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:262,name:'Лак Оскар Яхт 0.8л',brand:'oscar',category:'Лаки',basePrice:34000,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:158,name:'Битумный лак 0.7л',brand:'oscar',category:'Лаки',basePrice:7300,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:263,name:'Битум лак 4л',brand:'oscar',category:'Лаки',basePrice:58000,img:'https://i.ibb.co/7J5HJf6N/2026-02-23-181831.png'},
+  {id:159,name:'Травертин лак 2.5кг',brand:'oscar',category:'Лаки',basePrice:70400,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:264,name:'Травертин лак 5кг',brand:'oscar',category:'Лаки',basePrice:127000,img:'https://i.ibb.co/WpH5x0gS/2026-02-23-181842.png'},
+  {id:338,name:'Нитро Лак',brand:'oscar',category:'Лаки',basePrice:33100,img:'https://i.ibb.co/M5VsPjZy/2026-02-24-141642.png'},
+  // ═══ OSCAR — Грунтовки ═══
+  {id:156,name:'Грунтовка Веромакс 1л',brand:'oscar',category:'Грунтовки',basePrice:14100,img:'https://i.ibb.co/qLNxpZQS/2026-02-24-140806.png'},
+  {id:272,name:'Грунтовка Веромакс 5л',brand:'oscar',category:'Грунтовки',basePrice:31000,img:'https://i.ibb.co/qLNxpZQS/2026-02-24-140806.png'},
+  {id:154,name:'Антипас грунт 3кг',brand:'oscar',category:'Грунтовки',basePrice:88700,img:'https://i.ibb.co/jvkRPjXb/2026-02-19-174457.png'},
+  {id:271,name:'Грунтовка Антипас 0.7кг',brand:'oscar',category:'Грунтовки',basePrice:26000,img:'https://i.ibb.co/qLNxpZQS/2026-02-24-140806.png'},
+  {id:315,name:'Грунтовка Антипаз',brand:'oscar',category:'Грунтовки',basePrice:24800,img:'https://i.ibb.co/ZjjpYHr/2026-02-23-182128.png'},
+  {id:309,name:'Грунтовка Асос',brand:'oscar',category:'Грунтовки',basePrice:55000,img:'https://i.ibb.co/TxfNshpC/2026-02-24-142045.png'},
+  {id:160,name:'Бетоноконтакт 4кг',brand:'oscar',category:'Грунтовки',basePrice:42200,img:'https://i.ibb.co/WWtb7b60/2026-02-23-182157.png'},
+  {id:278,name:'Бетоноконтакт 12кг',brand:'oscar',category:'Грунтовки',basePrice:121000,img:'https://i.ibb.co/WWtb7b60/2026-02-23-182157.png'},
+  {id:144,name:'Жидкое стекло 1л',brand:'oscar',category:'Грунтовки',basePrice:8400,img:'https://i.ibb.co/MxqQqNMG/2026-02-23-182207.png'},
+  {id:143,name:'Гидроизоляция 5кг',brand:'oscar',category:'Грунтовки',basePrice:218000,img:'https://i.ibb.co/0yz7jq1b/2026-02-24-141352.png'},
+  {id:277,name:'Гидроизоляция 10кг',brand:'oscar',category:'Грунтовки',basePrice:352000,img:'https://i.ibb.co/0yz7jq1b/2026-02-24-141352.png'},
+  // ═══ OSCAR — Шпаклёвки ═══
+  {id:136,name:'Шпаклевка 0.35кг',brand:'oscar',category:'Шпаклёвки',basePrice:5900,img:'https://i.ibb.co/23phrjFy/2026-02-19-174215.png'},
+  {id:312,name:'Шпатлёвка 0.350кг',brand:'oscar',category:'Шпаклёвки',basePrice:5600,img:'https://i.ibb.co/Kxn6WJxp/2026-02-23-182007.png'},
+  {id:273,name:'Шпаклевка 0.8кг',brand:'oscar',category:'Шпаклёвки',basePrice:10000,img:'https://i.ibb.co/23phrjFy/2026-02-19-174215.png'},
+  {id:313,name:'Шпатлёвка 0.800кг',brand:'oscar',category:'Шпаклёвки',basePrice:9000,img:'https://i.ibb.co/9mD9JMvT/2026-02-23-182019.png'},
+  {id:274,name:'Шпаклевка 1.3кг',brand:'oscar',category:'Шпаклёвки',basePrice:15000,img:'https://i.ibb.co/23phrjFy/2026-02-19-174215.png'},
+  {id:314,name:'Шпатлёвка 1.300кг',brand:'oscar',category:'Шпаклёвки',basePrice:14100,img:'https://i.ibb.co/yFVHtsGY/2026-02-23-182052.png'},
+  {id:311,name:'Угол ПВХ с сеткой',brand:'oscar',category:'Шпаклёвки',basePrice:6800,img:'https://i.ibb.co/fYb9kTx4/2026-02-23-181955.png'},
+  {id:293,name:'Угол ПВХ сетка 2.4м',brand:'oscar',category:'Шпаклёвки',basePrice:8000,img:'https://i.ibb.co/5W3bgR4N/2026-02-24-141541.png'},
+  // ═══ OSCAR — Растворители ═══
+  {id:162,name:'Растворитель 646',brand:'oscar',category:'Растворители',basePrice:15200,img:'https://i.ibb.co/PsfFLQ1V/2026-02-24-141318.png'},
+  {id:163,name:'Разбавитель 0.5л',brand:'oscar',category:'Растворители',basePrice:3800,img:'https://i.ibb.co/mFTD6snH/2026-02-23-181558.png'},
+  {id:266,name:'Разбавитель 1.0л',brand:'oscar',category:'Растворители',basePrice:8000,img:'https://i.ibb.co/mFTD6snH/2026-02-23-181558.png'},
+  {id:139,name:'Олифа 0.7л',brand:'oscar',category:'Растворители',basePrice:17600,img:'https://i.ibb.co/qFgWLTXG/2026-02-23-181853.png'},
+  {id:265,name:'Олифа 2л',brand:'oscar',category:'Растворители',basePrice:75000,img:'https://i.ibb.co/qFgWLTXG/2026-02-23-181853.png'},
+  {id:339,name:'Морилка (NEW)',brand:'oscar',category:'Растворители',basePrice:11800,img:'https://i.ibb.co/4R7WdSZB/2026-02-24-141701.png'},
+  // ═══ OSCAR — Аэрозоли ═══
+  {id:155,name:'Аэрозоль Duafix',brand:'oscar',category:'Аэрозоли',basePrice:26700,img:'https://i.ibb.co/N2vhD8zT/2026-02-24-141521.png'},
+  {id:303,name:'Аэрозоль DUAFIX белая',brand:'oscar',category:'Аэрозоли',basePrice:10000,img:'https://i.ibb.co/N2vhD8zT/2026-02-24-141521.png'},
+  {id:304,name:'Аэрозоль DUAFIX золото',brand:'oscar',category:'Аэрозоли',basePrice:15000,img:'https://i.ibb.co/N2vhD8zT/2026-02-24-141521.png'},
+  {id:329,name:'Аэрозоль термостойкая Asos',brand:'oscar',category:'Аэрозоли',basePrice:25500,img:'https://i.ibb.co/wh4Dwgbj/2026-02-24-141230.png'},
+  // ═══ OSCAR — Клеи и герметики ═══
+  {id:135,name:'Жидкие гвозди DUAFIX',brand:'oscar',category:'Клеи',basePrice:16900,img:'https://i.ibb.co/996BBpbj/2026-02-24-141137.png'},
+  {id:306,name:'Томчи клей монтажный FIX',brand:'oscar',category:'Клеи',basePrice:21000,img:'https://i.ibb.co/996BBpbj/2026-02-24-141137.png'},
+  {id:322,name:'Duafix (клей)',brand:'oscar',category:'Клеи',basePrice:37600,img:'https://i.ibb.co/Y4hRGHJQ/2026-02-24-140825.png'},
+  {id:336,name:'Клей Стеклохолст DUAFIX',brand:'oscar',category:'Клеи',basePrice:179800,img:'https://i.ibb.co/CKwrj89t/2026-02-24-141451.png'},
+  {id:330,name:'Обойный клей Asos',brand:'oscar',category:'Клеи',basePrice:13400,img:'https://i.ibb.co/Xkvd52Rv/2026-02-24-141243.png'},
+  {id:305,name:'Силиконовый герметик DUAFIX',brand:'oscar',category:'Клеи',basePrice:22000,img:'https://i.ibb.co/PptYBmR/2026-02-19-174032.png'},
+  {id:344,name:'Акрил',brand:'oscar',category:'Клеи',basePrice:10300,img:'https://i.ibb.co/Z1F0xGH5/2026-02-24-141859.png'},
+  // ═══ OSCAR — Монтажная пена ═══
+  {id:301,name:'Монтажная пена 0.5кг',brand:'oscar',category:'Монтажная пена',basePrice:20000,img:'https://i.ibb.co/Cp0L4DVB/2026-02-24-141437.png'},
+  {id:302,name:'Монтажная пена 1.0кг',brand:'oscar',category:'Монтажная пена',basePrice:43000,img:'https://i.ibb.co/Cp0L4DVB/2026-02-24-141437.png'},
+  // ═══ OSCAR — Скотч и ленты ═══
+  {id:132,name:'Малярный скотч 4.5×10',brand:'oscar',category:'Скотч',basePrice:3100,img:'https://i.ibb.co/zhv5sT1N/2026-02-24-141150.png'},
+  {id:291,name:'Молярный скотч 6×20',brand:'oscar',category:'Скотч',basePrice:8000,img:'https://i.ibb.co/CkVG0hX/2026-02-24-140716.png'},
+  {id:316,name:'Двустронний скотч',brand:'oscar',category:'Скотч',basePrice:1100,img:'https://i.ibb.co/hxtHBNH9/2026-02-24-140501.png'},
+  {id:317,name:'SACA двустронный скотч',brand:'oscar',category:'Скотч',basePrice:2000,img:'https://i.ibb.co/Q7kXMdYS/2026-02-24-140607.png'},
+  {id:318,name:'Скотч фольга',brand:'oscar',category:'Скотч',basePrice:8700,img:'https://i.ibb.co/QvYYVRPH/2026-02-24-140653.png'},
+  {id:319,name:'Скотч молярный США',brand:'oscar',category:'Скотч',basePrice:900,img:'https://i.ibb.co/FL8nKkPw/2026-02-24-140728.png'},
+  {id:320,name:'Молярный скотч Целофан',brand:'oscar',category:'Скотч',basePrice:12100,img:'https://i.ibb.co/zhgzfMKm/2026-02-24-140738.png'},
+  {id:321,name:'Скотч WASHI (NEW)',brand:'oscar',category:'Скотч',basePrice:3900,img:'https://i.ibb.co/9kXSHNRv/2026-02-24-140756.png'},
+  {id:125,name:'Лента WASHI 2.5×10м',brand:'oscar',category:'Скотч',basePrice:4100,img:'https://i.ibb.co/4wVbkkq1/2026-02-24-140748.png'},
+  {id:126,name:'Алюм.лента 22м',brand:'oscar',category:'Скотч',basePrice:12000,img:'https://i.ibb.co/4wVbkkq1/2026-02-24-140748.png'},
+  {id:127,name:'Скотч авто 0.8×30м',brand:'oscar',category:'Скотч',basePrice:3500,img:'https://i.ibb.co/zhv5sT1N/2026-02-24-141150.png'},
+  {id:128,name:'Лента М3 10мм×1.5м',brand:'oscar',category:'Скотч',basePrice:2400,img:'https://i.ibb.co/4wVbkkq1/2026-02-24-140748.png'},
+  {id:129,name:'Лента SACA 10мм×5м',brand:'oscar',category:'Скотч',basePrice:2100,img:'https://i.ibb.co/4wVbkkq1/2026-02-24-140748.png'},
+  {id:130,name:'Скотч 2-стор. 1×10',brand:'oscar',category:'Скотч',basePrice:1200,img:'https://i.ibb.co/zhv5sT1N/2026-02-24-141150.png'},
+  {id:124,name:'Скотч хоз. 3.6×25м',brand:'oscar',category:'Скотч',basePrice:2100,img:'https://i.ibb.co/zhv5sT1N/2026-02-24-141150.png'},
+  {id:294,name:'Скотч хоз. 4.5×50м',brand:'oscar',category:'Скотч',basePrice:4000,img:'https://i.ibb.co/zhv5sT1N/2026-02-24-141150.png'},
+  {id:335,name:'Скотч автомобильный',brand:'oscar',category:'Скотч',basePrice:3900,img:'https://i.ibb.co/4r0mqBh/2026-02-24-141424.png'},
+  {id:343,name:'Баннер скотч',brand:'oscar',category:'Скотч',basePrice:6900,img:'https://i.ibb.co/HD673ZzY/2026-02-24-141848.png'},
+  {id:295,name:'Изолента 1.5×10"',brand:'oscar',category:'Скотч',basePrice:2000,img:'https://i.ibb.co/Z66x0bqv/2026-02-24-141507.png'},
+  // ═══ OSCAR — Инструменты / Валики ═══
+  {id:111,name:'Валик 38мм',brand:'oscar',category:'Инструменты',basePrice:9200,img:'https://i.ibb.co/tTWy03Sw/2026-02-24-140952.png'},
+  {id:112,name:'Валик 22мм',brand:'oscar',category:'Инструменты',basePrice:4400,img:'https://i.ibb.co/tTWy03Sw/2026-02-24-140952.png'},
+  {id:113,name:'Валик 55мм',brand:'oscar',category:'Инструменты',basePrice:11000,img:'https://i.ibb.co/tTWy03Sw/2026-02-24-140952.png'},
+  {id:114,name:'Валик Делюкс 55мм',brand:'oscar',category:'Инструменты',basePrice:20400,img:'https://i.ibb.co/tTWy03Sw/2026-02-24-140952.png'},
+  {id:281,name:'Валик 64мм (мешок)',brand:'oscar',category:'Инструменты',basePrice:14000,img:'https://i.ibb.co/svrSftmC/2026-02-24-140939.png'},
+  {id:282,name:'Валик Deluxe 64мм',brand:'oscar',category:'Инструменты',basePrice:22000,img:'https://i.ibb.co/V0XGr8sN/2026-02-24-141007.png'},
+  {id:326,name:'Валик палка',brand:'oscar',category:'Инструменты',basePrice:17400,img:'https://i.ibb.co/LznhT32f/2026-02-24-140927.png'},
+  {id:327,name:'Валик для Обоев',brand:'oscar',category:'Инструменты',basePrice:3900,img:'https://i.ibb.co/dwNK3rzb/2026-02-24-141020.png'},
+  {id:328,name:'Валик фасадный SPONGE',brand:'oscar',category:'Инструменты',basePrice:19500,img:'https://i.ibb.co/GfvRxB1V/2026-02-24-141031.png'},
+  {id:341,name:'Валик для наливного пола',brand:'oscar',category:'Инструменты',basePrice:11300,img:'https://i.ibb.co/svx8BJkm/2026-02-24-141729.png'},
+  {id:110,name:'Кисть деревянная 2"',brand:'oscar',category:'Инструменты',basePrice:4200,img:'https://i.ibb.co/CK4j0BjK/2026-02-24-141059.png'},
+  {id:283,name:'Щётка для лака 3.0"',brand:'oscar',category:'Инструменты',basePrice:9000,img:'https://i.ibb.co/YB1bGDxZ/2026-02-24-141042.png'},
+  {id:284,name:'Кисть деревянная 3.0"',brand:'oscar',category:'Инструменты',basePrice:7000,img:'https://i.ibb.co/CK4j0BjK/2026-02-24-141059.png'},
+  {id:285,name:'Кисть пластиковая 3.0"',brand:'oscar',category:'Инструменты',basePrice:4000,img:'https://i.ibb.co/1Gr3PLFV/2026-02-24-141123.png'},
+  {id:106,name:'Лоток для краски',brand:'oscar',category:'Инструменты',basePrice:2800,img:'https://i.ibb.co/BV5YFMQy/2026-02-24-141930.png'},
+  {id:105,name:'Шпатель обойный',brand:'oscar',category:'Инструменты',basePrice:2100,img:'https://i.ibb.co/m5yFksZH/2026-02-23-182218.png'},
+  {id:324,name:'Малярная кружка',brand:'oscar',category:'Инструменты',basePrice:4400,img:'https://i.ibb.co/v6F9CS4m/2026-02-24-140906.png'},
+  {id:325,name:'Набор латок/валик/нож',brand:'oscar',category:'Инструменты',basePrice:11800,img:'https://i.ibb.co/qL72tF8q/2026-02-24-140917.png'},
+  {id:323,name:'Рамки для розеток',brand:'oscar',category:'Инструменты',basePrice:800,img:'https://i.ibb.co/QFmjRBdN/2026-02-24-140856.png'},
+  {id:345,name:'Клин/зажим',brand:'oscar',category:'Инструменты',basePrice:16000,img:'https://i.ibb.co/0VD1XtNv/2026-02-24-141915.png'},
+  {id:340,name:'Ножи строительные',brand:'oscar',category:'Инструменты',basePrice:350,img:'https://i.ibb.co/bjXQWsX4/2026-02-24-141714.png'},
+  {id:307,name:'Шлифбумага липучка',brand:'oscar',category:'Инструменты',basePrice:10000,img:'https://i.ibb.co/rR64Rc9s/2026-02-24-141216.png'},
+  // ═══ OSCAR — Строительные материалы ═══
+  {id:137,name:'Фуга для швов 1кг',brand:'oscar',category:'Стройматериалы',basePrice:8400,img:'https://i.ibb.co/Q7thwMJt/2026-02-23-182107.png'},
+  {id:275,name:'Фуга для швов 4кг белая',brand:'oscar',category:'Стройматериалы',basePrice:25000,img:'https://i.ibb.co/TMNgxxk9/2026-02-23-182117.png'},
+  {id:138,name:'Антимороз 4л',brand:'oscar',category:'Стройматериалы',basePrice:9900,img:'https://i.ibb.co/gLXqnWJw/2026-02-23-182139.png'},
+  {id:276,name:'Антимороз 12кг',brand:'oscar',category:'Стройматериалы',basePrice:28000,img:'https://i.ibb.co/gLXqnWJw/2026-02-23-182139.png'},
+  {id:120,name:'Серпянка 45мм',brand:'oscar',category:'Стройматериалы',basePrice:3400,img:'https://i.ibb.co/4RY5gKz8/2026-02-24-140643.png'},
+  {id:292,name:'Серпянка 90мм',brand:'oscar',category:'Стройматериалы',basePrice:4000,img:'https://i.ibb.co/4RY5gKz8/2026-02-24-140643.png'},
+  {id:121,name:'Стык лента 45мм',brand:'oscar',category:'Стройматериалы',basePrice:8600,img:'https://i.ibb.co/vv3JcwMJ/2026-02-24-140703.png'},
+  {id:119,name:'Угол ПВХ с серп. 2.0м',brand:'oscar',category:'Стройматериалы',basePrice:7200,img:'https://i.ibb.co/5W3bgR4N/2026-02-24-141541.png'},
+  {id:118,name:'Сигнальная лента 5см',brand:'oscar',category:'Стройматериалы',basePrice:12000,img:'https://i.ibb.co/4wVbkkq1/2026-02-24-140748.png'},
+  {id:131,name:'Укрывная пленка 55×20',brand:'oscar',category:'Стройматериалы',basePrice:12700,img:'https://i.ibb.co/hJkPSGZQ/2026-02-19-174012.png'},
+  {id:337,name:'Стеклохолст',brand:'oscar',category:'Стройматериалы',basePrice:152200,img:'https://i.ibb.co/CKggC4B7/2026-02-24-141628.png'},
+  {id:103,name:'Крестики 2мм',brand:'oscar',category:'Стройматериалы',basePrice:1800,img:'https://i.ibb.co/27sknGsq/2026-02-24-140814.png'},
+  {id:342,name:'Каустическая сода',brand:'oscar',category:'Стройматериалы',basePrice:9000,img:'https://i.ibb.co/DgjbWZDF/2026-02-24-141837.png'},
+  {id:346,name:'Вытяжка',brand:'oscar',category:'Стройматериалы',basePrice:2900,img:'https://i.ibb.co/bMP3DF7m/2026-02-24-141941.png'},
+  {id:347,name:'Дюбель Держатель',brand:'oscar',category:'Стройматериалы',basePrice:40300,img:'https://i.ibb.co/jvTZXw7j/2026-02-24-141952.png'},
+  {id:348,name:'Спрей антикоррозийный W40',brand:'oscar',category:'Стройматериалы',basePrice:23200,img:'https://i.ibb.co/RWnWVNG/2026-02-24-142013.png'},
+  {id:331,name:'Разные Asos',brand:'oscar',category:'Стройматериалы',basePrice:14800,img:'https://i.ibb.co/JWLgSKRM/2026-02-24-141307.png'},
+  // ═══ ТЕХНОНИКОЛЬ — XPS Утеплитель ═══
+  {id:401,name:'CARBON ECO — XPS Утеплитель',brand:'techno',category:'Утеплитель',basePrice:0,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:402,name:'CARBON ECO FAS — Фасадный',brand:'techno',category:'Утеплитель',basePrice:0,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:403,name:'CARBON PROF — Профессиональный',brand:'techno',category:'Утеплитель',basePrice:0,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  // ═══ СТРОЙМАТЕРИАЛЫ — Общий каталог ═══
+  {id:501,name:'Штукатурка гипсовая 25кг',brand:'general',category:'Стройматериалы',basePrice:27000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:502,name:'Плиточный клей 25кг',brand:'general',category:'Стройматериалы',basePrice:27000,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+  {id:503,name:'Песок строительный',brand:'general',category:'Стройматериалы',basePrice:7500,img:'https://i.ibb.co/G4bxDvNw/2026-02-23-181636.png'},
+];
+
+var _ssFilter = 'all';
+var _ssSearch = '';
+
+function getSiteStockOverrides() { return db.productOverrides || {}; }
+
+function saveSiteStockOverrides() {
+  if (!db.productOverrides) db.productOverrides = {};
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+function toggleSiteStock(id) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var cur = db.productOverrides[id];
+  var isStock = cur ? cur.inStock : false;
+  var p = SITE_CATALOG.find(function(x){ return x.id === id; });
+  var existingPrice = cur && cur.price ? cur.price : (p ? p.basePrice : 0);
+  db.productOverrides[id] = Object.assign({}, cur || {}, {inStock: !isStock, price: existingPrice});
+  saveSiteStockOverrides();
+  renderSiteStockGrid();
+  showToast((isStock ? '\u274c Убрано из наличия' : '\u2705 Добавлено в наличие') + ' — ' + (p ? p.name : '#'+id), isStock ? 'warn' : 'ok');
+}
+
+function setSiteStockPrice(id, val) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var price = parseInt((val+'').replace(/\D/g,'')) || 0;
+  db.productOverrides[id] = Object.assign({}, db.productOverrides[id] || {}, {price: price});
+  saveSiteStockOverrides();
+}
+
+function filterSiteStock(type, el) {
+  _ssFilter = type;
+  document.querySelectorAll('#page-sitestock .ss-filter-btn').forEach(function(b){ b.classList.remove('ss-active'); });
+  if (el) el.classList.add('ss-active');
+  renderSiteStockGrid();
+}
+
+function searchSiteStock(val) {
+  _ssSearch = (val || '').toLowerCase();
+  renderSiteStockGrid();
+}
+
+function renderSiteStockGrid() {
+  var overrides = db.productOverrides || {};
+  var totalInStock = SITE_CATALOG.filter(function(p) { var ov = overrides[p.id]; return ov && ov.inStock; }).length;
+  var statsEl = document.getElementById('ss-stats');
+  if (statsEl) statsEl.textContent = totalInStock + ' из ' + SITE_CATALOG.length + ' товаров в наличии';
+
+  var items = SITE_CATALOG.filter(function(p) {
+    if (_ssFilter === 'aslan' && p.brand !== 'aslan') return false;
+    if (_ssFilter === 'oscar' && p.brand !== 'oscar') return false;
+    if (_ssFilter === 'instock') { var ov = overrides[p.id]; if (!ov || !ov.inStock) return false; }
+    if (_ssSearch) {
+      var hay = (p.name + ' ' + p.category + ' ' + p.id).toLowerCase();
+      if (hay.indexOf(_ssSearch) === -1) return false;
+    }
+    return true;
+  });
+
+  items.sort(function(a, b) {
+    var aIn = (overrides[a.id] && overrides[a.id].inStock) ? 1 : 0;
+    var bIn = (overrides[b.id] && overrides[b.id].inStock) ? 1 : 0;
+    if (bIn !== aIn) return bIn - aIn;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+
+  var container = document.getElementById('sitestockGrid');
+  if (!container) return;
+
+  var html = '';
+  items.forEach(function(p) {
+    var ov = overrides[p.id] || {};
+    var inStock = ov.inStock || false;
+    var price = ov.price || p.basePrice || '';
+    var brandColor = p.brand === 'aslan' ? '#a0bd41' : '#0d9488';
+    var brandLabel = p.brand === 'aslan' ? 'ASLAN' : 'OSCAR';
+    var cardBorder = inStock ? '2px solid rgba(34,197,94,.5)' : '1.5px solid #e2e8f0';
+    var cardBg = inStock ? '#f0fdf4' : 'white';
+
+    html += '<div style="background:'+cardBg+';border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07);border:'+cardBorder+';display:flex;flex-direction:column;">';
+    // Image
+    html += '<div style="width:100%;height:110px;background:#f8fafc;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">';
+    if (p.img) html += '<img src="'+p.img+'" style="max-height:100px;max-width:90%;object-fit:contain;" onerror="this.style.display=\'none\'">';
+    if (inStock) html += '<div style="position:absolute;top:8px;right:8px;background:#22c55e;color:white;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;">\u2705 В наличии</div>';
+    html += '</div>';
+    // Body
+    html += '<div style="padding:12px;display:flex;flex-direction:column;gap:8px;flex:1;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += '<span style="font-size:10px;font-weight:800;color:'+brandColor+';background:'+brandColor+'22;padding:2px 8px;border-radius:20px;">'+brandLabel+'</span>';
+    html += '<span style="font-size:10px;color:#94a3b8;">#'+p.id+'</span>';
+    html += '<span style="font-size:10px;color:#cbd5e1;margin-left:auto;">'+p.category+'</span>';
+    html += '</div>';
+    html += '<div style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.3;">'+p.name+'</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += '<span style="font-size:11px;color:#64748b;">\ud83d\udcb0</span>';
+    html += '<input type="number" min="0" value="'+(price||'')+'" placeholder="Цена" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;font-weight:700;color:#ef4444;font-family:inherit;" onchange="setSiteStockPrice('+p.id+',this.value)" onblur="setSiteStockPrice('+p.id+',this.value)">';
+    html += '<span style="font-size:10px;color:#94a3b8;">сум</span>';
+    html += '</div>';
+    html += '<button onclick="toggleSiteStock('+p.id+')" style="padding:9px;border:none;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;background:'+(inStock ? 'linear-gradient(135deg,#fee2e2,#fecaca)' : 'linear-gradient(135deg,#a0bd41,#7fa032)')+';color:'+(inStock ? '#991b1b' : 'white')+';">'+(inStock ? '\u26d4 Убрать из наличия' : '\u2705 Добавить в наличие')+'</button>';
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html || '<div style="color:#94a3b8;padding:60px;text-align:center;grid-column:1/-1;font-size:16px;">Товары не найдены</div>';
+}
+
+var _origShowPage = window.showPage;
+window.showPage = function(page) {
+  _origShowPage(page);
+  if (page === 'sitestock') setTimeout(renderSiteStockGrid, 50);
+  if (page === 'fullcatalog') setTimeout(fcRender, 60);
+};
+
+// ═══════════════════════════════════════════════════════════════
+// КАТАЛОГ ТОВАРОВ — полное управление через дашборд
+// ═══════════════════════════════════════════════════════════════
+var _fcFilter = 'all';
+
+var FC_BRAND_COLORS = {
+  aslan:   {fg:'#a0bd41', bg:'rgba(160,189,65,0.15)'},
+  oscar:   {fg:'#0d9488', bg:'rgba(13,148,136,0.15)'},
+  techno:  {fg:'#3b82f6', bg:'rgba(59,130,246,0.15)'},
+  general: {fg:'#22c55e', bg:'rgba(34,197,94,0.15)'}
+};
+
+function fcFilter(brand) {
+  _fcFilter = brand;
+  ['all','aslan','oscar','techno','general','instock'].forEach(function(b) {
+    var btn = document.getElementById('fcbtn-' + b);
+    if (!btn) return;
+    btn.classList.toggle('active', b === brand);
+  });
+  fcRender();
+}
+
+function fcRender() {
+  if (!db.productOverrides) db.productOverrides = {};
+  var ov = db.productOverrides;
+  var search = ((document.getElementById('fc-search') || {}).value || '').toLowerCase().trim();
+
+  var items = SITE_CATALOG.filter(function(p) {
+    if (_fcFilter !== 'all' && _fcFilter !== 'instock' && p.brand !== _fcFilter) return false;
+    if (_fcFilter === 'instock') { var o = ov[p.id]; if (!o || !o.inStock) return false; }
+    if (search) {
+      var hay = ((p.name||'') + ' ' + (p.category||'') + ' ' + p.id + ' ' + (p.brand||'')).toLowerCase();
+      if (hay.indexOf(search) < 0) return false;
+    }
+    return true;
+  });
+
+  // Sort: inStock first, then priority desc, then name
+  items.sort(function(a,b) {
+    var ao = ov[a.id]||{}, bo = ov[b.id]||{};
+    if (bo.inStock && !ao.inStock) return 1;
+    if (ao.inStock && !bo.inStock) return -1;
+    var ap = ao.priority||0, bp = bo.priority||0;
+    if (bp !== ap) return bp - ap;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+
+  // Stats
+  var total = SITE_CATALOG.length;
+  var inStockCnt = SITE_CATALOG.filter(function(p){ var o=ov[p.id]; return o&&o.inStock; }).length;
+  var el1 = document.getElementById('fc-lbl-total');
+  var el2 = document.getElementById('fc-lbl-stock');
+  if (el1) el1.textContent = total + ' товаров в каталоге · показано: ' + items.length;
+  if (el2) el2.textContent = '✅ ' + inStockCnt + ' в наличии   ❌ ' + (total-inStockCnt) + ' нет';
+
+  var body = document.getElementById('fcBody');
+  if (!body) return;
+
+  if (!items.length) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3);font-family:var(--mono);">Товары не найдены</td></tr>';
+    return;
+  }
+
+  body.innerHTML = items.map(function(p) {
+    var o = ov[p.id] || {};
+    var inStock = o.inStock || false;
+    var price   = o.price !== undefined ? o.price : (p.basePrice || '');
+    var discount = o.discount || '';
+    var prio    = o.priority || 0;
+    var bc = FC_BRAND_COLORS[p.brand] || {fg:'var(--text3)', bg:'rgba(255,255,255,0.05)'};
+    var rowStyle = inStock ? 'background:rgba(160,189,65,0.04);' : '';
+
+    var statusBtn = inStock
+      ? ('<button onclick="fcToggle('+p.id+')" style="width:100%;background:rgba(160,189,65,0.15);color:var(--green);border:1px solid rgba(160,189,65,0.4);padding:5px 8px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:700;cursor:pointer;white-space:nowrap;">✅ В НАЛИЧИИ</button>')
+      : ('<button onclick="fcToggle('+p.id+')" style="width:100%;background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.3);padding:5px 8px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:700;cursor:pointer;white-space:nowrap;">❌ НЕТ</button>');
+
+    var brandName = {aslan:'ASLAN',oscar:'OSCAR',techno:'ТЕХНОНИКОЛЬ',general:'СТРОЙМАТЕРИАЛЫ'}[p.brand] || p.brand.toUpperCase();
+
+    return '<tr style="'+rowStyle+'">'+
+      '<td><div style="width:44px;height:44px;background:var(--surface2);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;"><img src="'+p.img+'" style="max-width:42px;max-height:42px;object-fit:contain;" onerror="this.style.display=\'none\'"></div></td>'+
+      '<td>'+
+        '<div style="font-weight:600;font-size:13px;color:var(--text);">'+p.name+'</div>'+
+        (p.category ? '<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+p.category+'</div>' : '')+
+      '</td>'+
+      '<td><span style="font-family:var(--mono);font-size:11px;color:var(--text3);">#'+p.id+'</span></td>'+
+      '<td><span style="font-size:10px;font-weight:700;color:'+bc.fg+';background:'+bc.bg+';padding:3px 8px;border-radius:20px;white-space:nowrap;">'+brandName+'</span></td>'+
+      '<td>'+
+        '<div style="display:flex;align-items:center;gap:4px;">'+
+          '<input type="number" min="0" id="fcp-'+p.id+'" value="'+(price||'')+'" placeholder="Цена"'+
+          ' style="width:105px;background:var(--bg);border:1px solid var(--border2);color:var(--green);padding:5px 8px;font-family:var(--mono);font-size:12px;font-weight:700;border-radius:4px;outline:none;"'+
+          ' onchange="fcPriceSet('+p.id+',this.value)" onblur="fcPriceSet('+p.id+',this.value)">'+
+          '<span style="font-size:9px;color:var(--text3);">сум</span>'+
+        '</div>'+
+      '</td>'+
+      '<td>'+
+        '<div style="display:flex;align-items:center;gap:4px;">'+
+          '<input type="number" min="0" max="99" id="fcd-'+p.id+'" value="'+(discount||'')+'" placeholder="0"'+
+          ' style="width:55px;background:var(--bg);border:1px solid var(--border2);color:var(--yellow);padding:5px 8px;font-family:var(--mono);font-size:12px;font-weight:700;border-radius:4px;outline:none;text-align:center;"'+
+          ' onchange="fcDiscSet('+p.id+',this.value)">'+
+          '<span style="font-size:9px;color:var(--text3);">%</span>'+
+        '</div>'+
+      '</td>'+
+      '<td>'+statusBtn+'</td>'+
+      '<td>'+
+        '<input type="number" min="0" max="9999" id="fcqty-'+p.id+'" value="'+(o.qty||0)+'"'+
+        ' style="width:65px;background:var(--bg);border:1px solid var(--border2);color:var(--teal);padding:5px 8px;font-family:var(--mono);font-size:12px;text-align:center;border-radius:4px;outline:none;"'+
+        ' placeholder="0" title="Количество на складе"'+
+        ' onchange="fcQtySet('+p.id+',this.value)">'+
+        '<div style="font-size:9px;color:var(--text3);text-align:center;margin-top:2px;">шт</div>'+
+      '</td>'+
+      '<td>'+
+        '<input type="number" min="0" max="999" id="fcpr-'+p.id+'" value="'+prio+'"'+
+        ' style="width:60px;background:var(--bg);border:1px solid var(--border2);color:var(--yellow);padding:5px 8px;font-family:var(--mono);font-size:12px;text-align:center;border-radius:4px;outline:none;"'+
+        ' title="Приоритет: чем больше — тем раньше показывается"'+
+        ' onchange="fcPrioSet('+p.id+',this.value)">'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function fcToggle(id) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var cur = db.productOverrides[id] || {};
+  var nowIn = !cur.inStock;
+  var qty = nowIn ? (cur.qty && cur.qty > 0 ? cur.qty : 1) : 0;
+  db.productOverrides[id] = Object.assign({}, cur, {inStock: nowIn, qty: qty});
+  saveDB();
+  fcRender();
+  var p = SITE_CATALOG.find(function(x){ return x.id===id; });
+  showToast((nowIn ? '✅ В наличии: ' : '❌ Убрано: ') + (p ? p.name : '#'+id), nowIn ? 'ok' : 'warn');
+}
+
+function fcPriceSet(id, val) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var price = parseInt((val+'').replace(/[^0-9]/g,'')) || 0;
+  db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {price: price});
+}
+
+function fcDiscSet(id, val) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var disc = Math.min(99, Math.max(0, parseInt(val)||0));
+  db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {discount: disc});
+}
+
+function fcQtySet(id, val) {
+  if (!db.productOverrides) db.productOverrides = {};
+  var qty = Math.max(0, parseInt(val)||0);
+  var inStock = qty > 0;
+  db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {qty: qty, inStock: inStock});
+  saveDB();
+  fcRender();
+}
+
+function fcPrioSet(id, val) {
+  if (!db.productOverrides) db.productOverrides = {};
+  db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {priority: parseInt(val)||0});
+}
+
+function fcSaveAll() {
+  if (!db.productOverrides) db.productOverrides = {};
+  // Collect all price inputs
+  document.querySelectorAll('[id^="fcp-"]').forEach(function(inp) {
+    var id = parseInt(inp.id.replace('fcp-',''));
+    var price = parseInt((inp.value+'').replace(/[^0-9]/g,'')) || 0;
+    db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {price: price});
+  });
+  // Collect discount inputs
+  document.querySelectorAll('[id^="fcd-"]').forEach(function(inp) {
+    var id = parseInt(inp.id.replace('fcd-',''));
+    var disc = Math.min(99, Math.max(0, parseInt(inp.value)||0));
+    db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {discount: disc});
+  });
+  // Collect qty inputs
+  document.querySelectorAll('[id^="fcqty-"]').forEach(function(inp) {
+    var id = parseInt(inp.id.replace('fcqty-',''));
+    var qty = Math.max(0, parseInt(inp.value)||0);
+    db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {qty: qty, inStock: qty > 0});
+  });
+  // Collect priority inputs
+  document.querySelectorAll('[id^="fcpr-"]').forEach(function(inp) {
+    var id = parseInt(inp.id.replace('fcpr-',''));
+    db.productOverrides[id] = Object.assign({}, db.productOverrides[id]||{}, {priority: parseInt(inp.value)||0});
+  });
+  saveDB();
+  renderSiteStockGrid(); // also update sitestock view
+  fcRender();
+  showToast('💾 Все данные сохранены! Сайт обновлён автоматически.', 'ok');
+}
+
+function fcSetAll(state) {
+  if (!db.productOverrides) db.productOverrides = {};
+  SITE_CATALOG.forEach(function(p) {
+    db.productOverrides[p.id] = Object.assign({}, db.productOverrides[p.id]||{}, {inStock: state});
+  });
+  saveDB();
+  fcRender();
+  showToast(state ? '✅ Все товары — в наличии!' : '❌ Все товары убраны', state ? 'ok' : 'warn');
+}
+</script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================================
+// GPS TRACKER ENGINE
+// ============================================================
+// Angren city center coords
+const ANGREN_CENTER = [41.0174, 70.1435];
+const GPS_KEY = 'ecostroy_gps_agents';
+let gpsMap = null;
+let gpsAgents = [];
+let gpsMarkers = {};
+let gpsSimInterval = null;
+let gpsMapInited = false;
+let gpsSelectedId = null;
+
+const AGENT_ICONS = { courier:'🛵', supplier:'🚛', car:'🚗' };
+const AGENT_LABELS = { courier:'Курьер', supplier:'Поставщик', car:'Авто' };
+
+// Angren streets / waypoints simulation
+const ANGREN_WAYPOINTS = [
+  [41.0174, 70.1435],[41.0210, 70.1520],[41.0150, 70.1600],
+  [41.0090, 70.1480],[41.0230, 70.1350],[41.0120, 70.1280],
+  [41.0280, 70.1460],[41.0060, 70.1550],[41.0190, 70.1680],
+  [41.0040, 70.1360],[41.0300, 70.1570],[41.0170, 70.1200],
+];
+
+function gpsLoadAgents() {
+  try { gpsAgents = JSON.parse(localStorage.getItem(GPS_KEY) || '[]'); } catch(e) { gpsAgents = []; }
+}
+function gpsSaveAgents() { localStorage.setItem(GPS_KEY, JSON.stringify(gpsAgents)); }
+
+function gpsAddAgent() {
+  const name = document.getElementById('gps_name').value.trim();
+  const type = document.getElementById('gps_type').value;
+  const phone = document.getElementById('gps_phone').value.trim();
+  if (!name) { showToast('Введите имя', 'err'); return; }
+  const wp = ANGREN_WAYPOINTS[Math.floor(Math.random() * ANGREN_WAYPOINTS.length)];
+  const agent = {
+    id: 'agent_' + Date.now(),
+    name, type, phone,
+    lat: wp[0] + (Math.random()-0.5)*0.005,
+    lng: wp[1] + (Math.random()-0.5)*0.005,
+    status: 'active',
+    speed: Math.floor(Math.random()*40)+10,
+    battery: Math.floor(Math.random()*50)+50,
+    lastSeen: Date.now(),
+    targetWp: Math.floor(Math.random()*ANGREN_WAYPOINTS.length),
+    deliveries: Math.floor(Math.random()*8),
+    createdAt: new Date().toISOString(),
+  };
+  gpsAgents.push(agent);
+  gpsSaveAgents();
+  document.getElementById('gps_name').value = '';
+  document.getElementById('gps_phone').value = '';
+  gpsRenderAgentList();
+  gpsUpdateMap();
+  gpsRenderStats();
+  gpsLogEvent('➕', `${AGENT_ICONS[agent.type]} ${agent.name} добавлен в систему`, 'var(--green)');
+  showToast(`${agent.name} добавлен ✓`, 'ok');
+}
+
+function gpsDeleteAgent(id) {
+  const a = gpsAgents.find(x => x.id === id);
+  if (!a || !confirm(`Удалить ${a.name}?`)) return;
+  gpsAgents = gpsAgents.filter(x => x.id !== id);
+  gpsSaveAgents();
+  if (gpsMarkers[id]) { gpsMap.removeLayer(gpsMarkers[id]); delete gpsMarkers[id]; }
+  if (gpsSelectedId === id) gpsSelectedId = null;
+  gpsRenderAgentList();
+  gpsRenderStats();
+  gpsLogEvent('🗑️', `${a.name} удалён из системы`, 'var(--red)');
+}
+
+function gpsSetStatus(id, status) {
+  const a = gpsAgents.find(x => x.id === id);
+  if (!a) return;
+  a.status = status;
+  a.lastSeen = Date.now();
+  gpsSaveAgents();
+  gpsRenderAgentList();
+  gpsUpdateMap();
+  gpsRenderStats();
+  const labels = { active:'🟢 В сети', idle:'🟡 Ожидает', offline:'🔴 Офлайн' };
+  gpsLogEvent('📡', `${a.name}: ${labels[status]}`, status==='active'?'var(--green)':status==='idle'?'var(--yellow)':'var(--red)');
+  showToast(`${a.name}: ${labels[status]}`, 'ok');
+}
+
+function gpsRenderAgentList() {
+  const el = document.getElementById('gpsAgentList');
+  if (!el) return;
+  if (!gpsAgents.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0;text-align:center;">Нет агентов. Добавьте первого.</div>';
+    return;
+  }
+  el.innerHTML = gpsAgents.map(a => {
+    const dotColor = a.status === 'active' ? '' : a.status === 'idle' ? ' style="background:var(--yellow);animation:none;"' : ' class="red"';
+    const dotClass = a.status === 'active' ? 'gps-status-dot' : a.status === 'idle' ? 'gps-status-dot grey' : 'gps-status-dot red';
+    const batColor = a.battery > 50 ? 'var(--green)' : a.battery > 20 ? 'var(--yellow)' : 'var(--red)';
+    const mins = Math.floor((Date.now() - (a.lastSeen||Date.now()))/60000);
+    const selected = gpsSelectedId === a.id;
+    return `<div class="gps-card${selected?' active':''}" onclick="gpsSelectAgent('${a.id}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:20px;">${AGENT_ICONS[a.type]||'👤'}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.name}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">${AGENT_LABELS[a.type]||''} ${a.phone?'· '+a.phone:''}</div>
+        </div>
+        <div class="${dotClass}"${a.status==='idle'?' style="background:var(--yellow);animation:none;"':''}></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+        <div style="background:var(--bg);border-radius:4px;padding:6px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green);">${a.speed||0}</div>
+          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;">КМ/Ч</div>
+          <div class="speed-bar"><div class="speed-fill" style="width:${Math.min(100,a.speed||0)}%;background:${(a.speed||0)>60?'var(--red)':(a.speed||0)>30?'var(--yellow)':'var(--green)'};"></div></div>
+        </div>
+        <div style="background:var(--bg);border-radius:4px;padding:6px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${batColor};">${a.battery||0}%</div>
+          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;">БАТАРЕЯ</div>
+          <div class="speed-bar"><div class="speed-fill" style="width:${a.battery||0}%;background:${batColor};"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">📦 ${a.deliveries||0} доставок · ${mins < 1 ? 'только что' : mins+'м назад'}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        <button onclick="event.stopPropagation();gpsSetStatus('${a.id}','active')" style="flex:1;min-width:52px;background:rgba(160,189,65,0.1);border:1px solid rgba(160,189,65,0.3);color:var(--green);padding:4px 0;font-size:10px;font-family:var(--mono);border-radius:4px;cursor:pointer;" title="В сети">🟢</button>
+        <button onclick="event.stopPropagation();gpsSetStatus('${a.id}','idle')" style="flex:1;min-width:52px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--yellow);padding:4px 0;font-size:10px;font-family:var(--mono);border-radius:4px;cursor:pointer;" title="Пауза">🟡</button>
+        <button onclick="event.stopPropagation();gpsSetStatus('${a.id}','offline')" style="flex:1;min-width:52px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--red);padding:4px 0;font-size:10px;font-family:var(--mono);border-radius:4px;cursor:pointer;" title="Офлайн">🔴</button>
+        <button onclick="event.stopPropagation();gpsDeleteAgent('${a.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--red);padding:4px 8px;font-size:10px;font-family:var(--mono);border-radius:4px;cursor:pointer;"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function gpsSelectAgent(id) {
+  gpsSelectedId = id;
+  gpsRenderAgentList();
+  const a = gpsAgents.find(x => x.id === id);
+  if (a && gpsMarkers[id] && gpsMap) {
+    gpsMap.setView([a.lat, a.lng], 16, {animate:true});
+    gpsMarkers[id].openPopup();
+  }
+}
+
+function gpsUpdateMap() {
+  if (!gpsMap) return;
+  gpsAgents.forEach(a => {
+    const color = a.status === 'active' ? '#a0bd41' : a.status === 'idle' ? '#f59e0b' : '#6b7280';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        background:${color};border:3px solid white;
+        border-radius:50%;width:34px;height:34px;
+        display:flex;align-items:center;justify-content:center;
+        font-size:16px;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        ${a.status==='active'?'animation:markerPulse 1.5s infinite;':''}
+      ">${AGENT_ICONS[a.type]||'👤'}</div>
+      <div style="
+        position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+        background:rgba(0,0,0,0.75);color:white;font-size:10px;font-weight:700;
+        padding:2px 6px;border-radius:4px;white-space:nowrap;
+        font-family:monospace;
+      ">${a.name}</div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -20],
+    });
+    const popup = `
+      <div style="font-family:monospace;font-size:12px;min-width:160px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${AGENT_ICONS[a.type]} ${a.name}</div>
+        <div>📦 Доставок: <b>${a.deliveries||0}</b></div>
+        <div>🚀 Скорость: <b>${a.speed||0} км/ч</b></div>
+        <div>🔋 Батарея: <b>${a.battery||0}%</b></div>
+        <div>📍 ${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</div>
+        <div style="margin-top:4px;color:${a.status==='active'?'green':a.status==='idle'?'orange':'gray'};">
+          ${a.status==='active'?'🟢 В движении':a.status==='idle'?'🟡 Ожидает':'🔴 Офлайн'}
+        </div>
+      </div>`;
+    if (gpsMarkers[a.id]) {
+      gpsMarkers[a.id].setLatLng([a.lat, a.lng]).setIcon(icon).setPopupContent(popup);
+    } else {
+      gpsMarkers[a.id] = L.marker([a.lat, a.lng], {icon}).addTo(gpsMap).bindPopup(popup);
+    }
+  });
+}
+
+function gpsCenterMap() {
+  if (!gpsMap) return;
+  gpsMap.setView(ANGREN_CENTER, 14, {animate:true});
+}
+
+function gpsSimulateAll() {
+  if (gpsSimInterval) { clearInterval(gpsSimInterval); gpsSimInterval = null; showToast('Симуляция остановлена', 'err'); return; }
+  showToast('▶ Симуляция запущена', 'ok');
+  gpsSimInterval = setInterval(() => {
+    gpsAgents.forEach(a => {
+      if (a.status !== 'active') return;
+      const target = ANGREN_WAYPOINTS[a.targetWp % ANGREN_WAYPOINTS.length];
+      const dlat = target[0] - a.lat, dlng = target[1] - a.lng;
+      const dist = Math.sqrt(dlat*dlat + dlng*dlng);
+      if (dist < 0.0005) {
+        a.targetWp = (a.targetWp + 1) % ANGREN_WAYPOINTS.length;
+        a.deliveries = (a.deliveries || 0) + 1;
+        gpsLogEvent('📦', `${a.name} доставил заказ #${a.deliveries}`, 'var(--green)');
+      } else {
+        const step = 0.0004;
+        a.lat += (dlat / dist) * step + (Math.random()-0.5)*0.00008;
+        a.lng += (dlng / dist) * step + (Math.random()-0.5)*0.00008;
+      }
+      a.speed = Math.max(5, Math.min(70, (a.speed||30) + (Math.random()-0.5)*8));
+      a.battery = Math.max(5, (a.battery||100) - 0.05);
+      a.lastSeen = Date.now();
+    });
+    gpsSaveAgents();
+    gpsUpdateMap();
+    gpsRenderAgentList();
+    gpsRenderStats();
+  }, 1200);
+}
+
+function gpsRenderStats() {
+  const el = document.getElementById('gpsStatsGrid');
+  if (!el) return;
+  const total = gpsAgents.length;
+  const active = gpsAgents.filter(a => a.status === 'active').length;
+  const idle = gpsAgents.filter(a => a.status === 'idle').length;
+  const offline = gpsAgents.filter(a => a.status === 'offline').length;
+  const deliveries = gpsAgents.reduce((s, a) => s + (a.deliveries || 0), 0);
+  el.innerHTML = `
+    <div class="stat-card green"><div class="stat-val">${total}</div><div class="stat-label">Всего агентов</div></div>
+    <div class="stat-card teal"><div class="stat-val">${active}</div><div class="stat-label">🟢 В сети</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${idle}</div><div class="stat-label">🟡 Ожидают</div></div>
+    <div class="stat-card red"><div class="stat-val">${offline}</div><div class="stat-label">🔴 Офлайн</div></div>
+    <div class="stat-card blue"><div class="stat-val">${deliveries}</div><div class="stat-label">📦 Доставок сегодня</div></div>
+  `;
+}
+
+function gpsLogEvent(icon, msg, color) {
+  const el = document.getElementById('gpsEventLog');
+  if (!el) return;
+  const now = new Date().toLocaleTimeString('ru-RU');
+  const row = document.createElement('div');
+  row.className = 'gps-event-row';
+  row.innerHTML = `
+    <span style="font-size:16px;flex-shrink:0;">${icon}</span>
+    <div style="flex:1;">
+      <div style="color:${color||'var(--text)'};font-size:12px;">${msg}</div>
+    </div>
+    <div style="color:var(--text3);font-size:10px;font-family:var(--mono);flex-shrink:0;">${now}</div>`;
+  el.insertBefore(row, el.firstChild);
+  // Keep max 30 events
+  while (el.children.length > 30) el.removeChild(el.lastChild);
+}
+
+function initGPSTracker() {
+  gpsLoadAgents();
+  gpsRenderStats();
+  gpsRenderAgentList();
+
+  // Initialize map after DOM renders
+  setTimeout(() => {
+    const container = document.getElementById('gpsMap');
+    if (!container) return;
+    if (gpsMapInited && gpsMap) { gpsMap.invalidateSize(); gpsUpdateMap(); return; }
+    gpsMap = L.map('gpsMap', { zoomControl: true }).setView(ANGREN_CENTER, 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 18
+    }).addTo(gpsMap);
+
+    // Add warehouse marker
+    const whIcon = L.divIcon({
+      className:'',
+      html:`<div style="background:#a0bd41;border:3px solid white;border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,0.5);">🏪</div>
+            <div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#a0bd41;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;font-family:monospace;">EcoStroy Склад</div>`,
+      iconSize:[36,36], iconAnchor:[18,18], popupAnchor:[0,-20]
+    });
+    L.marker(ANGREN_CENTER, {icon:whIcon}).addTo(gpsMap)
+      .bindPopup('<b>🏪 EcoStroy</b><br>Главный склад · Ангрен');
+
+    gpsMapInited = true;
+    gpsUpdateMap();
+    gpsLogEvent('🛰️', 'GPS система инициализирована', 'var(--green)');
+
+    // Add default demo agents if empty
+    if (!gpsAgents.length) {
+      [
+        {name:'Бобур Ходжаев', type:'courier', phone:'+998 90 111-22-33'},
+        {name:'Отабек Юсупов', type:'supplier', phone:'+998 91 444-55-66'},
+        {name:'Шерзод Каримов', type:'car', phone:'+998 93 777-88-99'},
+      ].forEach(d => {
+        document.getElementById('gps_name').value = d.name;
+        document.getElementById('gps_type').value = d.type;
+        document.getElementById('gps_phone').value = d.phone;
+        gpsAddAgent();
+      });
+    }
+  }, 300);
+}
+</script>
+</body>
+</html>
